@@ -19,13 +19,14 @@ def face_path(face_id: int) -> Path:
     return FACES_DIR / f"{face_id}.jpg"
 
 
-def make_thumb(img: Image.Image, photo_id: int):
+def thumb_image(img: Image.Image) -> Image.Image:
+    """Grid thumbnail as a PIL image (saved later once the photo id is known)."""
     t = ImageOps.exif_transpose(img).copy()
     t.thumbnail((THUMB_SIZE, THUMB_SIZE))
-    t.convert("RGB").save(thumb_path(photo_id), "JPEG", quality=82)
+    return t.convert("RGB")
 
 
-def make_face_crop(img_rgb: np.ndarray, bbox: tuple[float, float, float, float], face_id: int):
+def face_crop_image(img_rgb: np.ndarray, bbox: tuple[float, float, float, float]) -> Image.Image:
     h, w = img_rgb.shape[:2]
     x, y, bw, bh = bbox
     mx, my = bw * FACE_MARGIN, bh * FACE_MARGIN
@@ -33,4 +34,4 @@ def make_face_crop(img_rgb: np.ndarray, bbox: tuple[float, float, float, float],
     x2 = int(min(w, x + bw + mx)); y2 = int(min(h, y + bh + my))
     crop = Image.fromarray(img_rgb[y1:y2, x1:x2])
     crop.thumbnail((FACE_SIZE, FACE_SIZE))
-    crop.convert("RGB").save(face_path(face_id), "JPEG", quality=85)
+    return crop.convert("RGB")

@@ -17,7 +17,8 @@ def _load():
         if _model is None:
             import open_clip
             import torch
-            torch.set_num_threads(max(1, (torch.get_num_threads() or 4)))
+            # Scanner workers run CLIP concurrently; keep each inference narrow.
+            torch.set_num_threads(2)
             _model, _, _preprocess = open_clip.create_model_and_transforms(
                 "ViT-B-32", pretrained="openai")
             _model.eval()

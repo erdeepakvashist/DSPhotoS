@@ -83,9 +83,13 @@ def list_clusters():
 def assign_cluster(cluster_id: int, body: AssignIn):
     conn = get_conn()
     pid = _person_for(conn, body)
+    embs = [r["embedding"] for r in conn.execute(
+        "SELECT embedding FROM faces WHERE cluster_id=? AND person_id IS NULL AND ignored=0",
+        (cluster_id,))]
     conn.execute(
         "UPDATE faces SET person_id=?, assigned_by='user', cluster_id=NULL "
         "WHERE cluster_id=? AND person_id IS NULL AND ignored=0", (pid, cluster_id))
+    matching.save_exemplars(conn, pid, embs)
     conn.execute("DELETE FROM clusters WHERE id=?", (cluster_id,))
     conn.commit()
     matching.rematch_unknowns(conn)  # naming someone may resolve other unknowns
@@ -102,6 +106,9 @@ def patch_face(face_id: int, body: FacePatch):
     pid = _person_for(conn, body)
     conn.execute("UPDATE faces SET person_id=?, assigned_by='user', cluster_id=NULL WHERE id=?",
                  (pid, face_id))
+    row = conn.execute("SELECT embedding FROM faces WHERE id=?", (face_id,)).fetchone()
+    if row:
+        matching.save_exemplars(conn, pid, [row["embedding"]])
     conn.commit()
     matching.rematch_unknowns(conn)
     return {"ok": True, "person_id": pid}

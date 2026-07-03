@@ -3,7 +3,7 @@
 Uses InsightFace's buffalo_l ONNX models directly (auto-downloaded from the
 official release) — same accuracy as the insightface package, no compiled deps.
 """
-import io
+import threading
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -58,6 +58,9 @@ class FaceEngine:
         det_path, rec_path = _ensure_models()
         opts = ort.SessionOptions()
         opts.log_severity_level = 3
+        # Scanner runs several inferences concurrently; keep each one narrow so
+        # they don't fight over cores.
+        opts.intra_op_num_threads = 2
         self.det = ort.InferenceSession(str(det_path), opts, providers=["CPUExecutionProvider"])
         self.rec = ort.InferenceSession(str(rec_path), opts, providers=["CPUExecutionProvider"])
         self.det_input = self.det.get_inputs()[0].name
@@ -152,10 +155,14 @@ def _nms(boxes: np.ndarray, scores: np.ndarray, thresh: float) -> list[int]:
 
 
 _engine: FaceEngine | None = None
+_engine_lock = threading.Lock()
 
 
 def get_engine() -> FaceEngine:
+    """Thread-safe lazy singleton; ort session.run() is safe to call concurrently."""
     global _engine
     if _engine is None:
-        _engine = FaceEngine()
+        with _engine_lock:
+            if _engine is None:
+                _engine = FaceEngine()
     return _engine

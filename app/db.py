@@ -1,9 +1,12 @@
 """SQLite layer: schema + connection helpers. All tags live here; photo files are never modified."""
+import os
 import sqlite3
 import threading
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# DPS_DATA_DIR env var overrides where the DB/thumbs/models live (used by tests)
+DATA_DIR = Path(os.environ.get("DPS_DATA_DIR",
+                               Path(__file__).resolve().parent.parent / "data"))
 DB_PATH = DATA_DIR / "photos.db"
 THUMBS_DIR = DATA_DIR / "thumbs"
 FACES_DIR = DATA_DIR / "thumbs" / "faces"
@@ -51,6 +54,15 @@ CREATE TABLE IF NOT EXISTS faces (
 CREATE INDEX IF NOT EXISTS idx_faces_photo ON faces(photo_id);
 CREATE INDEX IF NOT EXISTS idx_faces_person ON faces(person_id);
 CREATE INDEX IF NOT EXISTS idx_faces_cluster ON faces(cluster_id);
+CREATE TABLE IF NOT EXISTS person_exemplars (
+    -- embeddings of user-confirmed faces; survive photo re-scans/purges so
+    -- people never need re-tagging
+    id INTEGER PRIMARY KEY,
+    person_id INTEGER NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+    embedding BLOB NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_exemplars_person ON person_exemplars(person_id);
 CREATE TABLE IF NOT EXISTS albums (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -87,5 +99,11 @@ def init_db():
     THUMBS_DIR.mkdir(parents=True, exist_ok=True)
     FACES_DIR.mkdir(parents=True, exist_ok=True)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    get_conn().executescript(SCHEMA)
-    get_conn().commit()
+    conn = get_conn()
+    conn.executescript(SCHEMA)
+    # migrations for DBs created before these columns existed
+    try:
+        conn.execute("ALTER TABLE albums ADD COLUMN auto TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already present
+    conn.commit()

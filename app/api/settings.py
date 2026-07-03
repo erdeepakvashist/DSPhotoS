@@ -1,14 +1,50 @@
-"""Scan folders management + scan trigger/status + index stats."""
+"""Scan folders management + scan trigger/status + index stats + app lifecycle."""
 import os
+import subprocess
+import sys
 import threading
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import scanner
 from ..db import get_conn
 
 router = APIRouter(prefix="/api")
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _exit_soon():
+    """Give the HTTP response time to flush, then terminate the process."""
+    threading.Timer(0.7, lambda: os._exit(0)).start()
+
+
+@router.post("/app/stop")
+def app_stop():
+    _exit_soon()
+    return {"ok": True, "message": "App stopping — reopen with run.bat"}
+
+
+@router.post("/app/restart")
+def app_restart(request: Request):
+    port = request.url.port or 8000
+    py = str(ROOT / ".venv" / "Scripts" / "python.exe")
+    # A detached process has no console, so cmd's `timeout` fails there; delay
+    # in Python instead, then replace the bootstrap with the real server.
+    boot = (f"import time, os; time.sleep(2); "
+            f"os.execv({py!r}, [{py!r}, '-m', 'uvicorn', 'app.main:app', "
+            f"'--host', '127.0.0.1', '--port', '{port}'])")
+    # Detached processes have no console: without real stdout/stderr handles
+    # uvicorn's log writes crash it, so send them to a log file.
+    from ..db import DATA_DIR
+    log = open(DATA_DIR / "server.log", "ab")
+    subprocess.Popen([py, "-c", boot], cwd=str(ROOT),
+                     stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                     creationflags=subprocess.DETACHED_PROCESS
+                     | subprocess.CREATE_NEW_PROCESS_GROUP)
+    _exit_soon()
+    return {"ok": True}
 
 
 class FolderIn(BaseModel):
@@ -66,6 +102,13 @@ def pick_folder():
 def start_scan():
     if not scanner.start_scan():
         raise HTTPException(409, "Scan already running")
+    return {"ok": True}
+
+
+@router.post("/scan/stop")
+def stop_scan():
+    if not scanner.stop_scan():
+        raise HTTPException(409, "No scan running")
     return {"ok": True}
 
 

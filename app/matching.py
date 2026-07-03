@@ -20,14 +20,30 @@ def _centroid(vecs: list[np.ndarray]) -> np.ndarray:
     return c / (np.linalg.norm(c) + 1e-9)
 
 
+EXEMPLAR_CAP = 32  # confirmed embeddings kept per person
+
+
 def person_centroids(conn: sqlite3.Connection) -> dict[int, np.ndarray]:
+    """Centroids from current faces plus stored exemplars, so identities survive
+    photo purges and re-scans."""
     rows = conn.execute(
         "SELECT person_id, embedding FROM faces WHERE person_id IS NOT NULL AND ignored=0"
     ).fetchall()
+    rows += conn.execute("SELECT person_id, embedding FROM person_exemplars").fetchall()
     groups: dict[int, list[np.ndarray]] = {}
     for r in rows:
         groups.setdefault(r["person_id"], []).append(_to_vec(r["embedding"]))
     return {pid: _centroid(v) for pid, v in groups.items()}
+
+
+def save_exemplars(conn: sqlite3.Connection, person_id: int, embeddings: list[bytes]):
+    """Persist user-confirmed face embeddings (capped, oldest pruned first)."""
+    conn.executemany("INSERT INTO person_exemplars(person_id, embedding) VALUES (?,?)",
+                     [(person_id, e) for e in embeddings])
+    conn.execute(
+        "DELETE FROM person_exemplars WHERE person_id=? AND id NOT IN "
+        "(SELECT id FROM person_exemplars WHERE person_id=? ORDER BY id DESC LIMIT ?)",
+        (person_id, person_id, EXEMPLAR_CAP))
 
 
 def cluster_centroids(conn: sqlite3.Connection) -> dict[int, np.ndarray]:

@@ -3,6 +3,8 @@ uvicorn[standard]>=0.30
 onnxruntime>=1.17
 opencv-python>=4.9
 pillow>=10.3
-numpy>=1.26,<2.0
+numpy>=1.26
 torch>=2.2
 open_clip_torch>=2.24
+reverse_geocoder>=1.5
+

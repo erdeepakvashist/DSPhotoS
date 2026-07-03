@@ -90,6 +90,23 @@ function bindChrome() {
     try { await api.send("POST", "/api/scan"); } catch (e) { /* already running */ }
     pollStatus();
   };
+  $("#stop-scan-btn").onclick = async () => {
+    try { await api.send("POST", "/api/scan/stop"); } catch (e) { /* not running */ }
+    pollStatus();
+  };
+  $("#restart-app-btn").onclick = async () => {
+    if (!confirm("Restart the app? A running scan will stop (it resumes on the next scan).")) return;
+    try { await api.send("POST", "/api/app/restart"); } catch (e) {}
+    document.body.innerHTML = '<div class="empty" style="padding-top:30vh">Restarting… this page will reload automatically.</div>';
+    const wait = setInterval(async () => {
+      try { await fetch("/api/scan/status"); clearInterval(wait); location.reload(); } catch (e) {}
+    }, 1500);
+  };
+  $("#stop-app-btn").onclick = async () => {
+    if (!confirm("Quit the app? Reopen it later with run.bat.")) return;
+    try { await api.send("POST", "/api/app/stop"); } catch (e) {}
+    document.body.innerHTML = '<div class="empty" style="padding-top:30vh">App stopped. Reopen it with run.bat, then refresh this page.</div>';
+  };
   bindLightbox();
 }
 
@@ -362,13 +379,21 @@ async function loadAlbums() {
   fav.append(el("div", "name", "Favorites"));
   fav.onclick = () => (location.hash = "#favorites");
   g.appendChild(fav);
+  let sawAuto = false;
   for (const a of albums) {
+    if (a.auto && !sawAuto) {
+      sawAuto = true;
+      const h = el("div", "month-h", "✨ Smart albums (auto-created from places, trips and themes)");
+      h.style.gridColumn = "1 / -1";
+      g.appendChild(h);
+    }
     const c = el("div", "card");
     const pic = el("div", "pic");
     if (a.cover) pic.appendChild(Object.assign(el("img"), { src: "/media/thumb/" + a.cover, loading: "lazy" }));
-    c.append(pic, el("div", "name", a.name), el("div", "sub", `${a.photo_count} photos`));
+    c.append(pic, el("div", "name", a.name),
+             el("div", "sub", `${a.photo_count} photos${a.auto ? " · auto" : ""}`));
     c.onclick = () => (location.hash = "#album/" + a.id);
-    c.oncontextmenu = async (e) => {
+    if (!a.auto) c.oncontextmenu = async (e) => {
       e.preventDefault();
       if (confirm(`Delete album "${a.name}"? (Photos are not deleted.)`)) {
         await api.send("DELETE", `/api/albums/${a.id}`); loadAlbums();
@@ -464,10 +489,13 @@ async function pollStatus() {
   updateUnknownBadge(s.stats.clusters);
   if (state.route !== "settings") return;
   const prog = $("#scan-progress"), bar = $("#scan-bar"), st = $("#scan-status");
-  if (s.state === "scanning") {
+  const running = s.state === "scanning" || s.state === "stopping";
+  $("#stop-scan-btn").classList.toggle("hidden", s.state !== "scanning");
+  if (running) {
     prog.classList.remove("hidden");
     bar.style.width = s.total ? (100 * s.done / s.total) + "%" : "0%";
-    st.textContent = `Scanning… ${s.done}/${s.total} ${s.current}`;
+    st.textContent = s.state === "stopping" ? "Stopping…" :
+      `Scanning… ${s.done}/${s.total} ${s.current}`;
     $("#scan-btn").disabled = true;
   } else {
     prog.classList.add("hidden");

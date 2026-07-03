@@ -19,10 +19,10 @@ class PhotosIn(BaseModel):
 def list_albums():
     conn = get_conn()
     return [dict(r) for r in conn.execute(
-        "SELECT a.id, a.name, COUNT(ap.photo_id) photo_count, "
+        "SELECT a.id, a.name, a.auto, COUNT(ap.photo_id) photo_count, "
         "COALESCE(a.cover_photo_id, MIN(ap.photo_id)) cover "
         "FROM albums a LEFT JOIN album_photos ap ON ap.album_id=a.id "
-        "GROUP BY a.id ORDER BY a.created_at DESC")]
+        "GROUP BY a.id ORDER BY a.auto IS NOT NULL, a.created_at DESC")]
 
 
 @router.post("/albums")
