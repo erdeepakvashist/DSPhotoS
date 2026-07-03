@@ -1,4 +1,4 @@
-# DeepakPhotoSearch
+# DS PhotoS
 
 A locally hosted, Google Photos-style web app for your own photo folders.
 

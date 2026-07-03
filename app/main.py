@@ -10,7 +10,7 @@ from .db import init_db
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 
-app = FastAPI(title="DeepakPhotoSearch")
+app = FastAPI(title="DS PhotoS")
 init_db()
 
 for r in (settings.router, timeline.router, people.router, albums.router, photos.router):
