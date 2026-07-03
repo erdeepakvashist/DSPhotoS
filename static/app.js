@@ -527,7 +527,17 @@ async function pollStatus() {
 }
 
 /* ---------------- lightbox ---------------- */
+let lbFadeTimer = null;
+function lbWakeOverlay() {
+  // tags show while the mouse moves, fade away after it goes idle
+  const ov = $("#lb-overlay");
+  ov.classList.remove("faded");
+  clearTimeout(lbFadeTimer);
+  lbFadeTimer = setTimeout(() => ov.classList.add("faded"), 2200);
+}
+
 function bindLightbox() {
+  $("#lightbox").addEventListener("mousemove", lbWakeOverlay);
   $("#lb-close").onclick = closeLightbox;
   $("#lb-prev").onclick = () => stepLightbox(-1);
   $("#lb-next").onclick = () => stepLightbox(1);
@@ -596,6 +606,7 @@ async function renderLightbox() {
   $("#lb-fav").classList.toggle("on", !!detail.favorite);
   $("#lb-faces").classList.toggle("on", state.lbFaces);
   if (img.complete) positionFaceBoxes(); else img.onload = positionFaceBoxes;
+  lbWakeOverlay(); // show tags briefly on open/navigation, then fade
   renderInfoPanel(detail);
 }
 
