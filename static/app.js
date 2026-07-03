@@ -84,6 +84,7 @@ function bindChrome() {
     if (name) { await api.send("POST", "/api/albums", { name }); loadAlbums(); }
   };
   $("#add-folder-btn").onclick = addFolder;
+  $("#browse-folder-btn").onclick = browseFolder;
   $("#folder-input").addEventListener("keydown", (e) => e.key === "Enter" && addFolder());
   $("#scan-btn").onclick = async () => {
     try { await api.send("POST", "/api/scan"); } catch (e) { /* already running */ }
@@ -428,6 +429,21 @@ async function loadSettings() {
     li.append(el("span", "", f.path), rm);
     ul.appendChild(li);
   }
+}
+
+async function browseFolder() {
+  const btn = $("#browse-folder-btn");
+  btn.disabled = true;
+  btn.textContent = "Choose the folder in the Windows dialog…";
+  try {
+    const r = await api.get("/api/pick-folder");
+    if (r.path) {
+      await api.send("POST", "/api/folders", { path: r.path });
+      loadSettings();
+    }
+  } catch (e) { alert(e.message || "Could not open the folder dialog."); }
+  btn.disabled = false;
+  btn.textContent = "📁 Add folder…";
 }
 
 async function addFolder() {

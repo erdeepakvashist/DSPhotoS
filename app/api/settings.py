@@ -1,5 +1,6 @@
 """Scan folders management + scan trigger/status + index stats."""
 import os
+import threading
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -37,6 +38,28 @@ def remove_folder(folder_id: int):
     conn.execute("DELETE FROM folders WHERE id=?", (folder_id,))
     conn.commit()
     return {"ok": True}
+
+
+_picker_lock = threading.Lock()
+
+
+@router.get("/pick-folder")
+def pick_folder():
+    """Open the native Windows folder dialog on this machine (the server and the
+    browser are the same PC) and return the chosen path."""
+    if not _picker_lock.acquire(blocking=False):
+        raise HTTPException(409, "A folder dialog is already open — check your taskbar")
+    try:
+        import tkinter
+        from tkinter import filedialog
+        root = tkinter.Tk()
+        root.withdraw()
+        root.wm_attributes("-topmost", 1)
+        path = filedialog.askdirectory(parent=root, title="Choose a photo folder")
+        root.destroy()
+        return {"path": os.path.normpath(path) if path else None}
+    finally:
+        _picker_lock.release()
 
 
 @router.post("/scan")
