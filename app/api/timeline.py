@@ -1,0 +1,77 @@
+"""One paginated endpoint powers every photo grid (timeline, person, album,
+favorites, CLIP text search); filters combine."""
+from fastapi import APIRouter
+
+from .. import clip_search
+from ..db import get_conn
+
+router = APIRouter(prefix="/api")
+PAGE = 120
+
+
+@router.get("/timeline")
+def timeline(cursor: str = "", person: int | None = None, album: int | None = None,
+             favorites: int = 0, query: str = ""):
+    conn = get_conn()
+
+    if query.strip():
+        # CLIP search: relevance order, cursor = integer offset into ranked ids.
+        ranked = clip_search.search(conn, query.strip())
+        ranked = _apply_filters(conn, ranked, person, album, favorites)
+        off = int(cursor) if cursor else 0
+        page = ranked[off:off + PAGE]
+        items = _photos_by_ids(conn, page)
+        next_cursor = str(off + PAGE) if off + PAGE < len(ranked) else None
+        return {"items": items, "next_cursor": next_cursor, "mode": "search"}
+
+    where, params = ["1=1"], []
+    if person:
+        where.append("p.id IN (SELECT photo_id FROM faces WHERE person_id=? AND ignored=0)")
+        params.append(person)
+    if album:
+        where.append("p.id IN (SELECT photo_id FROM album_photos WHERE album_id=?)")
+        params.append(album)
+    if favorites:
+        where.append("p.favorite=1")
+    if cursor:
+        taken, pid = cursor.rsplit("|", 1)
+        where.append("(p.taken_at < ? OR (p.taken_at = ? AND p.id < ?))")
+        params += [taken, taken, int(pid)]
+
+    rows = conn.execute(
+        f"SELECT p.id, p.taken_at, p.width, p.height, p.favorite FROM photos p "
+        f"WHERE {' AND '.join(where)} ORDER BY p.taken_at DESC, p.id DESC LIMIT {PAGE + 1}",
+        params).fetchall()
+    items = [dict(r) for r in rows[:PAGE]]
+    next_cursor = None
+    if len(rows) > PAGE:
+        last = items[-1]
+        next_cursor = f"{last['taken_at']}|{last['id']}"
+    return {"items": items, "next_cursor": next_cursor, "mode": "timeline"}
+
+
+def _apply_filters(conn, ids: list[int], person, album, favorites) -> list[int]:
+    if not (person or album or favorites) or not ids:
+        return ids
+    qmarks = ",".join("?" * len(ids))
+    where, params = [f"p.id IN ({qmarks})"], list(ids)
+    if person:
+        where.append("p.id IN (SELECT photo_id FROM faces WHERE person_id=? AND ignored=0)")
+        params.append(person)
+    if album:
+        where.append("p.id IN (SELECT photo_id FROM album_photos WHERE album_id=?)")
+        params.append(album)
+    if favorites:
+        where.append("p.favorite=1")
+    ok = {r["id"] for r in conn.execute(
+        f"SELECT p.id FROM photos p WHERE {' AND '.join(where)}", params)}
+    return [i for i in ids if i in ok]
+
+
+def _photos_by_ids(conn, ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    qmarks = ",".join("?" * len(ids))
+    rows = {r["id"]: dict(r) for r in conn.execute(
+        f"SELECT id, taken_at, width, height, favorite FROM photos WHERE id IN ({qmarks})", ids)}
+    return [rows[i] for i in ids if i in rows]
