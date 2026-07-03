@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepakPhotoSearch</title>
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📸</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo" onclick="location.hash='#photos'">📸 <span>DeepakPhotoSearch</span></div>
+  <div class="searchbox">
+    <input id="search-input" type="search" placeholder="Search photos — try &quot;beach&quot;, &quot;dog&quot;, &quot;birthday cake&quot;…">
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="#photos"    data-tab="photos">Photos</a>
+  <a href="#people"    data-tab="people">People</a>
+  <a href="#unknown"   data-tab="unknown">Unknown <span id="unknown-badge" class="badge hidden"></span></a>
+  <a href="#albums"    data-tab="albums">Albums</a>
+  <a href="#map"       data-tab="map">Map</a>
+  <a href="#settings"  data-tab="settings">Settings</a>
+</nav>
+
+<main id="main">
+  <div id="view-grid" class="view">
+    <div id="grid-header" class="grid-header hidden"></div>
+    <div id="grid"></div>
+    <div id="grid-sentinel"></div>
+    <div id="grid-empty" class="empty hidden"></div>
+  </div>
+
+  <div id="view-people" class="view hidden"><div id="people-grid" class="cards"></div></div>
+
+  <div id="view-unknown" class="view hidden">
+    <p class="hint">Groups of similar faces the app couldn't identify. Type a name to tag
+      the whole group — matching faces elsewhere will be tagged automatically.</p>
+    <div id="cluster-list"></div>
+  </div>
+
+  <div id="view-albums" class="view hidden">
+    <div class="toolbar">
+      <button id="new-album-btn" class="btn">＋ New album</button>
+    </div>
+    <div id="albums-grid" class="cards"></div>
+  </div>
+
+  <div id="view-map" class="view hidden"><div id="map"></div></div>
+
+  <div id="view-settings" class="view hidden">
+    <h2>Photo folders</h2>
+    <ul id="folder-list" class="folder-list"></ul>
+    <div class="row">
+      <input id="folder-input" type="text" placeholder="C:\Users\erdee\Pictures">
+      <button id="add-folder-btn" class="btn">Add folder</button>
+    </div>
+    <div class="row">
+      <button id="scan-btn" class="btn primary">Scan now</button>
+      <span id="scan-note" class="hint"></span>
+    </div>
+    <div id="scan-progress" class="progress hidden"><div id="scan-bar"></div></div>
+    <div id="scan-status" class="hint"></div>
+    <h2>Index</h2>
+    <div id="index-stats" class="stats"></div>
+  </div>
+</main>
+
+<!-- selection action bar -->
+<div id="selbar" class="selbar hidden">
+  <span id="selbar-count"></span>
+  <button class="btn" id="sel-album">Add to album</button>
+  <button class="btn" id="sel-fav">♥ Favorite</button>
+  <button class="btn ghost" id="sel-clear">Cancel</button>
+</div>
+
+<!-- lightbox -->
+<div id="lightbox" class="lightbox hidden">
+  <div class="lb-top">
+    <button class="icon-btn" id="lb-close" title="Close (Esc)">✕</button>
+    <div class="lb-spacer"></div>
+    <button class="icon-btn" id="lb-fav" title="Favorite (F)">♡</button>
+    <button class="icon-btn" id="lb-album" title="Add to album">➕</button>
+    <button class="icon-btn" id="lb-faces" title="Show faces (B)">👤</button>
+    <button class="icon-btn" id="lb-info" title="Info (I)">ⓘ</button>
+  </div>
+  <button class="lb-nav prev" id="lb-prev" title="Previous (←)">‹</button>
+  <button class="lb-nav next" id="lb-next" title="Next (→)">›</button>
+  <div class="lb-stage" id="lb-stage">
+    <img id="lb-img" alt="">
+    <div id="lb-overlay"></div>
+  </div>
+  <aside id="lb-panel" class="lb-panel hidden"></aside>
+</div>
+
+<!-- generic modal -->
+<div id="modal" class="modal hidden"><div class="modal-box" id="modal-box"></div></div>
+
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
