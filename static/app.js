@@ -35,9 +35,16 @@ window.addEventListener("hashchange", route);
 window.addEventListener("DOMContentLoaded", () => {
   bindChrome();
   route();
-  pollStatus();
-  setInterval(pollStatus, 4000);
+  pollLoop();
 });
+
+let lastScanState = "idle";
+async function pollLoop() {
+  await pollStatus();
+  // poll fast while a scan runs so progress feels live, slow when idle
+  const busy = lastScanState === "scanning" || lastScanState === "stopping";
+  setTimeout(pollLoop, busy ? 1200 : 4000);
+}
 
 function route() {
   const h = (location.hash || "#photos").slice(1);
@@ -486,16 +493,27 @@ async function addFolder() {
 async function pollStatus() {
   let s;
   try { s = await api.get("/api/scan/status"); } catch { return; }
+  lastScanState = s.state;
   updateUnknownBadge(s.stats.clusters);
+  const running = s.state === "scanning" || s.state === "stopping";
+
+  // progress chip in the top bar — visible on every tab
+  const chip = $("#scan-chip");
+  chip.classList.toggle("hidden", !running);
+  if (running) {
+    $("#scan-chip-text").textContent = s.state === "stopping" ? "Stopping…" :
+      s.total ? `Scanning ${s.done}/${s.total}` : (s.phase || "Scanning…");
+  }
+
   if (state.route !== "settings") return;
   const prog = $("#scan-progress"), bar = $("#scan-bar"), st = $("#scan-status");
-  const running = s.state === "scanning" || s.state === "stopping";
   $("#stop-scan-btn").classList.toggle("hidden", s.state !== "scanning");
   if (running) {
     prog.classList.remove("hidden");
     bar.style.width = s.total ? (100 * s.done / s.total) + "%" : "0%";
-    st.textContent = s.state === "stopping" ? "Stopping…" :
-      `Scanning… ${s.done}/${s.total} ${s.current}`;
+    const detail = [s.phase, s.total ? `${s.done}/${s.total}` : "", s.current]
+      .filter(Boolean).join(" · ");
+    st.textContent = s.state === "stopping" ? "Stopping…" : detail || "Scanning…";
     $("#scan-btn").disabled = true;
   } else {
     prog.classList.add("hidden");

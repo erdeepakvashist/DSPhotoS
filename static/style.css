@@ -26,6 +26,18 @@ body {
   background: var(--bg3); color: var(--fg); font-size: 14px; outline: none;
 }
 .searchbox input:focus { background: #2d3640; }
+.scan-chip {
+  display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap;
+  background: rgba(138,180,248,.14); color: var(--accent);
+  border-radius: 16px; padding: 6px 14px; font-size: 13px; max-width: 340px;
+}
+.scan-chip span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.spinner {
+  width: 13px; height: 13px; flex: none; border-radius: 50%;
+  border: 2px solid rgba(138,180,248,.3); border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .tabs {
   display: flex; gap: 4px; padding: 6px 12px; background: var(--bg2);
   border-bottom: 1px solid #000; position: sticky; top: 52px; z-index: 29;

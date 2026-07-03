@@ -22,7 +22,9 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 WORKERS = max(2, min(6, (os.cpu_count() or 4) - 2))
 
 # Progress shared with /api/scan/status. 'state': idle | scanning | stopping | error
-STATUS = {"state": "idle", "total": 0, "done": 0, "current": "", "new_photos": 0, "error": ""}
+# 'phase' says what the scan is doing even before per-photo progress exists.
+STATUS = {"state": "idle", "phase": "", "total": 0, "done": 0, "current": "",
+          "new_photos": 0, "error": ""}
 _scan_lock = threading.Lock()
 _stop = threading.Event()
 
@@ -32,9 +34,21 @@ def start_scan() -> bool:
     if STATUS["state"] in ("scanning", "stopping"):
         return False
     _stop.clear()
-    STATUS.update(state="scanning", total=0, done=0, current="", new_photos=0, error="")
+    STATUS.update(state="scanning", phase="starting…", total=0, done=0, current="",
+                  new_photos=0, error="")
     threading.Thread(target=_run_scan, daemon=True).start()
     return True
+
+
+def _lower_thread_priority():
+    """Workers run below normal priority so the web UI stays responsive while
+    the CPU is saturated with inference."""
+    try:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.SetThreadPriority(k32.GetCurrentThread(), -1)  # THREAD_PRIORITY_BELOW_NORMAL
+    except Exception:
+        pass
 
 
 def stop_scan() -> bool:
@@ -62,6 +76,7 @@ def _scan():
     folders = [r["path"] for r in conn.execute("SELECT path FROM folders")]
 
     # Collect candidate files, skipping already-indexed unchanged ones.
+    STATUS["phase"] = "finding photos…"
     known = {r["path"]: r["mtime"] for r in conn.execute("SELECT path, mtime FROM photos")}
     todo, seen = [], set()
     for root in folders:
@@ -71,6 +86,8 @@ def _scan():
                     continue
                 p = os.path.join(dirpath, fn)
                 seen.add(p)
+                if len(seen) % 500 == 0:
+                    STATUS["current"] = f"{len(seen)} files found, {len(todo)} new"
                 try:
                     mtime = os.path.getmtime(p)
                 except OSError:
@@ -92,15 +109,18 @@ def _scan():
         conn.commit()
 
     STATUS["total"] = len(todo)
+    STATUS["current"] = ""
     if todo:
+        STATUS["phase"] = "loading AI models (first run downloads them, ~650 MB)…"
         get_engine()  # load models once before workers start
         clip_search.embed_text("warmup")
     persons = matching.person_centroids(conn) if todo else {}
     clusters = matching.cluster_centroids(conn) if todo else {}
+    STATUS["phase"] = "indexing photos" if todo else ""
 
     # Sliding window of in-flight futures keeps memory bounded while all
     # WORKERS stay busy; results are stored in submission order.
-    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
         window = deque()
         todo_iter = iter(todo)
         while True:
@@ -127,12 +147,12 @@ def _scan():
     matching._drop_empty_clusters(conn)
     conn.commit()
     if STATUS["new_photos"] or gone:
-        STATUS["current"] = "building smart albums…"
+        STATUS.update(phase="building smart albums…", current="")
         try:
             smart_albums.regenerate(conn)
         except Exception:
             traceback.print_exc()  # smart albums are best-effort
-    STATUS["current"] = ""
+    STATUS.update(phase="", current="")
 
 
 def _process_photo(path: str, mtime: float) -> dict:
