@@ -140,13 +140,14 @@ input[type=text], input[type=search] { font: inherit; }
 .selbar {
   position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
   background: var(--bg3); border-radius: 28px; padding: 10px 18px;
-  display: flex; gap: 10px; align-items: center; z-index: 40;
+  display: flex; gap: 10px; align-items: center; z-index: 4000;
   box-shadow: 0 4px 18px rgba(0,0,0,.5);
 }
 
 /* ---- lightbox ---- */
 .lightbox {
-  position: fixed; inset: 0; background: rgba(8,10,12,.97); z-index: 50;
+  /* above Leaflet's panes/controls (z-index up to ~1000) */
+  position: fixed; inset: 0; background: rgba(8,10,12,.97); z-index: 5000;
   display: flex; align-items: center; justify-content: center;
 }
 .lb-top {
@@ -195,7 +196,7 @@ input[type=text], input[type=search] { font: inherit; }
 
 /* ---- modal ---- */
 .modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60;
+  position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 6000;
   display: flex; align-items: center; justify-content: center;
 }
 .modal-box {

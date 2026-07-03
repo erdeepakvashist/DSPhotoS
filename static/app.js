@@ -404,13 +404,14 @@ async function loadMap() {
     pts.push([lat, lon]);
     const mk = L.marker([lat, lon]).addTo(state.mapLayer);
     const html = g.slice(0, 8).map((m) =>
-      `<a href="#p"><img data-open="${m.id}" src="/media/thumb/${m.id}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin:2px"></a>`).join("") +
+      `<img data-open="${m.id}" src="/media/thumb/${m.id}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin:2px;cursor:pointer">`).join("") +
       (g.length > 8 ? `<div>+${g.length - 8} more</div>` : "");
     mk.bindPopup(html, { maxWidth: 320 });
   }
+  state.map.off("popupopen");
   state.map.on("popupopen", (e) => {
     e.popup.getElement().querySelectorAll("img[data-open]").forEach((img) => {
-      img.parentElement.onclick = (ev) => { ev.preventDefault(); openLightboxSingle(+img.dataset.open); };
+      img.onclick = () => openLightboxSingle(+img.dataset.open);
     });
   });
   state.map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
