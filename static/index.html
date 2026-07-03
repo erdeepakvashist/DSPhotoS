@@ -10,8 +10,10 @@
 </head>
 <body>
 <header class="topbar">
-  <div class="logo" onclick="location.hash='#photos'">📸 <span>DeepakPhotoSearch</span></div>
+  <div class="logo" onclick="location.hash='#photos'"><span class="logo-mark">📸</span>
+    <span class="logo-text">Deepak<b>Photo</b>Search</span></div>
   <div class="searchbox">
+    <span class="search-ico">⌕</span>
     <input id="search-input" type="search" placeholder="Search photos — try &quot;beach&quot;, &quot;dog&quot;, &quot;birthday cake&quot;…">
   </div>
   <div id="scan-chip" class="scan-chip hidden" title="Scan progress — click for details"
@@ -55,29 +57,35 @@
   <div id="view-map" class="view hidden"><div id="map"></div></div>
 
   <div id="view-settings" class="view hidden">
-    <h2>Photo folders</h2>
-    <ul id="folder-list" class="folder-list"></ul>
-    <div class="row">
-      <button id="browse-folder-btn" class="btn primary">📁 Add folder…</button>
-      <span class="hint">or type a path:</span>
-      <input id="folder-input" type="text" placeholder="C:\Users\erdee\Pictures">
-      <button id="add-folder-btn" class="btn">Add</button>
-    </div>
-    <div class="row">
-      <button id="scan-btn" class="btn primary">Scan now</button>
-      <button id="stop-scan-btn" class="btn danger hidden">⏹ Stop scan</button>
-      <span id="scan-note" class="hint"></span>
-    </div>
-    <div id="scan-progress" class="progress hidden"><div id="scan-bar"></div></div>
-    <div id="scan-status" class="hint"></div>
-    <h2>Index</h2>
-    <div id="index-stats" class="stats"></div>
-    <h2>App</h2>
-    <div class="row">
-      <button id="restart-app-btn" class="btn">🔄 Restart app</button>
-      <button id="stop-app-btn" class="btn danger">⏻ Quit app</button>
-      <span class="hint">Restart applies updates; after Quit, reopen with run.bat.</span>
-    </div>
+    <section class="panel">
+      <h2>📂 Photo folders</h2>
+      <ul id="folder-list" class="folder-list"></ul>
+      <div class="row">
+        <button id="browse-folder-btn" class="btn primary">Add folder…</button>
+        <span class="hint">or type a path:</span>
+        <input id="folder-input" type="text" placeholder="C:\Users\erdee\Pictures">
+        <button id="add-folder-btn" class="btn">Add</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>🔍 Scanning</h2>
+      <div class="row">
+        <button id="scan-btn" class="btn primary">Scan now</button>
+        <button id="stop-scan-btn" class="btn danger hidden">⏹ Stop scan</button>
+        <span id="scan-note" class="hint"></span>
+      </div>
+      <div id="scan-progress" class="progress hidden"><div id="scan-bar"></div></div>
+      <div id="scan-status" class="hint"></div>
+      <div id="index-stats" class="stats"></div>
+    </section>
+    <section class="panel">
+      <h2>⚙️ App</h2>
+      <div class="row">
+        <button id="restart-app-btn" class="btn">🔄 Restart app</button>
+        <button id="stop-app-btn" class="btn danger">⏻ Quit app</button>
+        <span class="hint">Restart applies updates; after Quit, reopen with run.bat.</span>
+      </div>
+    </section>
   </div>
 </main>
 

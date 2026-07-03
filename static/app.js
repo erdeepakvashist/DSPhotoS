@@ -476,7 +476,7 @@ async function browseFolder() {
     }
   } catch (e) { alert(e.message || "Could not open the folder dialog."); }
   btn.disabled = false;
-  btn.textContent = "📁 Add folder…";
+  btn.textContent = "Add folder…";
 }
 
 async function addFolder() {
