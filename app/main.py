@@ -19,6 +19,17 @@ for r in (settings.router, timeline.router, people.router, albums.router, photos
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+@app.middleware("http")
+async def no_stale_ui(request, call_next):
+    """Force browsers to revalidate UI files so updates apply on a normal reload
+    (media thumbs stay cacheable)."""
+    response = await call_next(request)
+    p = request.url.path
+    if p == "/" or p.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
