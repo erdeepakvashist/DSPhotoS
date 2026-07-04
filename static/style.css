@@ -115,6 +115,20 @@ main { flex: 1; overflow-y: auto; padding: 20px 22px 40px; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---- memories strip ---- */
+.memories-strip { margin: 6px 2px 22px; display: flex; flex-direction: column; gap: 14px; }
+.memory-card {
+  background: var(--panel, rgba(139,180,248,.06)); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.memory-title { font-size: 14px; font-weight: 600; color: var(--fg2); margin-bottom: 10px; }
+.memory-photos { display: flex; gap: 8px; overflow-x: auto; }
+.memory-photos img {
+  height: 100px; width: 100px; object-fit: cover; border-radius: 8px; cursor: pointer;
+  flex-shrink: 0; transition: transform .15s ease;
+}
+.memory-photos img:hover { transform: scale(1.04); }
+
 /* ---- photo grid ---- */
 .grid-header {
   font-size: 22px; font-weight: 650; margin: 6px 2px 16px;

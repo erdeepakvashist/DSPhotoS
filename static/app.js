@@ -76,7 +76,35 @@ function route() {
     if (name === "favorites") f.favorites = 1;
     if (name === "search") f.query = decodeURIComponent(arg || "");
     startGrid(f);
+    if (name === "photos" && !arg) loadMemories(); else $("#memories-strip").classList.add("hidden");
   }
+}
+
+async function loadMemories() {
+  const strip = $("#memories-strip");
+  const groups = await api.get("/api/memories");
+  if (!groups.length) { strip.classList.add("hidden"); return; }
+  strip.innerHTML = "";
+  for (const g of groups) {
+    const yearsAgo = new Date().getFullYear() - g.year;
+    const card = el("div", "memory-card");
+    card.append(el("div", "memory-title", `📅 On this day, ${yearsAgo} year${yearsAgo === 1 ? "" : "s"} ago`));
+    const row = el("div", "memory-photos");
+    for (const p of g.photos.slice(0, 8)) {
+      const img = document.createElement("img");
+      img.src = `/media/thumb/${p.id}`;
+      img.onclick = () => openMemoryPhoto(g.photos, p.id);
+      row.appendChild(img);
+    }
+    card.appendChild(row);
+    strip.appendChild(card);
+  }
+  strip.classList.remove("hidden");
+}
+
+function openMemoryPhoto(photos, photoId) {
+  state.items = photos;
+  openLightbox(photos.findIndex((p) => p.id === photoId));
 }
 
 function bindChrome() {
