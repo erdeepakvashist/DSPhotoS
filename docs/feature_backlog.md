@@ -56,8 +56,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    smart_albums.py; added `GET /api/albums/{id}/photos` (full ordered list)
    plus a "▶ Play as story" fullscreen auto-advancing slideshow (any album,
    not just auto-generated ones), with progress segments and pause/prev/next.
-10. **Search suggestions** — log query text, surface top recent/frequent
-    queries as autocomplete under the search box.
+10. **Search suggestions** — new `search_history` table logs each submitted
+    query (`POST /api/search/log`); `GET /api/search/suggestions` ranks past
+    queries by frequency then recency. A dropdown under the search box shows
+    them on focus (when the box is empty).
 11. **Mobile LAN upload** — `/upload` page + endpoint reachable from phone
     browsers on the same LAN, saved into a watched folder.
 12. **Face-level dedup** — within near-duplicate photo groups, prefer the photo

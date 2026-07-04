@@ -86,6 +86,29 @@ function route() {
   }
 }
 
+async function showSuggestions() {
+  const box = $("#search-suggestions");
+  const suggestions = await api.get("/api/search/suggestions");
+  if (!suggestions.length) { box.classList.add("hidden"); return; }
+  box.innerHTML = "";
+  for (const q of suggestions) {
+    const row = el("div", "suggestion-row", "🕘 " + q);
+    row.onmousedown = (e) => {
+      e.preventDefault();
+      $("#search-input").value = q;
+      hideSuggestions();
+      api.send("POST", "/api/search/log", { query: q }).catch(() => {});
+      location.hash = "#search/" + encodeURIComponent(q);
+    };
+    box.appendChild(row);
+  }
+  box.classList.remove("hidden");
+}
+
+function hideSuggestions() {
+  $("#search-suggestions").classList.add("hidden");
+}
+
 async function loadMemories() {
   const strip = $("#memories-strip");
   const groups = await api.get("/api/memories");
@@ -118,8 +141,15 @@ function bindChrome() {
   si.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       const q = si.value.trim();
+      hideSuggestions();
+      if (q) api.send("POST", "/api/search/log", { query: q }).catch(() => {});
       location.hash = q ? "#search/" + encodeURIComponent(q) : "#photos";
     }
+  });
+  si.addEventListener("focus", () => { if (!si.value.trim()) showSuggestions(); });
+  si.addEventListener("input", () => { if (!si.value.trim()) showSuggestions(); else hideSuggestions(); });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".searchbox")) hideSuggestions();
   });
   $("#cam-btn").onclick = cameraSearch;
   $("#sel-clear").onclick = clearSelection;

@@ -63,6 +63,13 @@ body {
   box-shadow: 0 0 0 3px rgba(75,144,245,.15);
 }
 .searchbox input { padding-right: 46px; }
+.search-suggestions {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; z-index: 60; box-shadow: var(--shadow);
+}
+.suggestion-row { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.suggestion-row:hover { background: var(--bg4); }
 .cam-btn {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;

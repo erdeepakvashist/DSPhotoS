@@ -79,6 +79,12 @@ CREATE TABLE IF NOT EXISTS clip_embeddings (
     photo_id INTEGER PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE,
     embedding BLOB NOT NULL     -- 512 x float32, L2-normalized
 );
+CREATE TABLE IF NOT EXISTS search_history (
+    id INTEGER PRIMARY KEY,
+    query TEXT NOT NULL,
+    searched_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);
 """
 
 
