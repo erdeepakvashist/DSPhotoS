@@ -274,6 +274,11 @@ async function loadMore() {
   state.done = !data.next_cursor;
   appendItems(data.items, data.mode);
   state.loading = false;
+  if (f.query && data.place) {
+    $("#grid-header").innerHTML = "";
+    $("#grid-header").append(el("span", "", `“${data.theme}” in ${data.place}`));
+    $("#grid-header").classList.remove("hidden");
+  }
   if (!state.items.length) {
     const e = $("#grid-empty");
     e.classList.remove("hidden");
@@ -886,6 +891,12 @@ function bindLightbox() {
   $("#lb-faces").onclick = () => { state.lbFaces = !state.lbFaces; renderLightbox(); };
   $("#lb-share").onclick = shareSafely;
   $("#lb-info").onclick = () => $("#lb-panel").classList.toggle("hidden");
+  const stage = $("#lb-stage");
+  stage.addEventListener("wheel", lbWheelZoom, { passive: false });
+  stage.addEventListener("mousedown", lbDragStart);
+  document.addEventListener("mousemove", lbDragMove);
+  document.addEventListener("mouseup", lbDragEnd);
+  stage.addEventListener("dblclick", resetLbZoom);
   window.addEventListener("resize", () => !lbHidden() && positionFaceBoxes());
   document.addEventListener("keydown", (e) => {
     if (!$("#modal").classList.contains("hidden")) { if (e.key === "Escape") closeModal(); return; }
@@ -917,9 +928,62 @@ async function openLightboxSingle(photoId) {
   renderLightbox();
 }
 
+/* ---------------- lightbox zoom (mouse wheel + drag-to-pan) ---------------- */
+const lbZoom = { scale: 1, tx: 0, ty: 0, dragging: false, lastX: 0, lastY: 0 };
+
+function resetLbZoom() {
+  lbZoom.scale = 1; lbZoom.tx = 0; lbZoom.ty = 0;
+  applyLbZoom();
+}
+
+function applyLbZoom() {
+  const stage = $("#lb-stage");
+  stage.style.transform = `translate(${lbZoom.tx}px, ${lbZoom.ty}px) scale(${lbZoom.scale})`;
+  stage.classList.toggle("zoomed", lbZoom.scale > 1);
+}
+
+function lbWheelZoom(e) {
+  e.preventDefault();
+  const rect = $("#lb-img").getBoundingClientRect();
+  // cursor position in the image's own (unscaled) coordinate space, so the
+  // point under the cursor stays fixed as the scale changes
+  const lx = (e.clientX - rect.left) / lbZoom.scale;
+  const ly = (e.clientY - rect.top) / lbZoom.scale;
+  const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+  const newScale = Math.min(6, Math.max(1, lbZoom.scale * factor));
+  if (newScale === lbZoom.scale) return;
+  lbZoom.tx += lx * (lbZoom.scale - newScale);
+  lbZoom.ty += ly * (lbZoom.scale - newScale);
+  lbZoom.scale = newScale;
+  if (lbZoom.scale === 1) { lbZoom.tx = 0; lbZoom.ty = 0; }
+  applyLbZoom();
+}
+
+function lbDragStart(e) {
+  if (lbZoom.scale <= 1) return;
+  lbZoom.dragging = true;
+  lbZoom.lastX = e.clientX; lbZoom.lastY = e.clientY;
+  $("#lb-stage").classList.add("dragging");
+  e.preventDefault();
+}
+
+function lbDragMove(e) {
+  if (!lbZoom.dragging) return;
+  lbZoom.tx += e.clientX - lbZoom.lastX;
+  lbZoom.ty += e.clientY - lbZoom.lastY;
+  lbZoom.lastX = e.clientX; lbZoom.lastY = e.clientY;
+  applyLbZoom();
+}
+
+function lbDragEnd() {
+  lbZoom.dragging = false;
+  $("#lb-stage").classList.remove("dragging");
+}
+
 function closeLightbox() {
   $("#lightbox").classList.add("hidden");
   $("#lb-panel").classList.add("hidden");
+  resetLbZoom();
 }
 
 async function stepLightbox(d) {
@@ -937,6 +1001,7 @@ async function stepLightbox(d) {
 async function renderLightbox() {
   const it = state.items[state.lbIndex];
   if (!it) return;
+  resetLbZoom();
   const img = $("#lb-img");
   img.src = "/media/photo/" + it.id;
   $("#lb-overlay").innerHTML = "";

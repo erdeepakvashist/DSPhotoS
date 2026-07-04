@@ -78,3 +78,25 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 12. **Face-level dedup** — within near-duplicate photo groups, prefer the photo
     whose faces have the highest `det_score` (sharpest) when suggesting which
     to keep.
+
+## Additional requests (post-backlog)
+
+| Request | Status | Commit |
+|---|---|---|
+| Sharpness backfill for pre-existing photos | ✅ | 60384e4 |
+| Configurable Archive folder (Settings) | ✅ | c850d65 |
+| Lightbox zoom (mouse wheel + drag-to-pan) | ✅ | (pending) |
+| Location-aware search ("marriage in Ambala") | ✅ | (pending) |
+
+- **Lightbox zoom** — mouse wheel zooms in/out (1x–6x) anchored to the cursor
+  position via `translate()+scale()` math on `#lb-stage`; drag-to-pan once
+  zoomed in; double-click or navigating/closing resets zoom. Face-box overlay
+  stays aligned because it scales along with the image inside the same
+  transformed container.
+- **Location-aware search** — queries like "marriage in Ambala" are split into
+  a CLIP theme ("marriage") and a place ("Ambala"), matched against
+  reverse-geocoded photo locations (new shared `app/geocode.py`, factored out
+  of `smart_albums.py`/`hotspots.py`). The split only happens if the trailing
+  phrase actually matches a geocoded place in the library, so ordinary
+  queries containing " in " (e.g. "kids playing in the rain") aren't
+  misparsed. Falls back to a plain CLIP search otherwise.

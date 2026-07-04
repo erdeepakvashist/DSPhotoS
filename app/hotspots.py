@@ -1,23 +1,14 @@
 """GPS hotspot detection for the map view: named places ranked by photo count,
-via the same offline reverse-geocoder smart_albums.py uses for place albums.
+via the shared offline reverse-geocoder in geocode.py.
 """
 import sqlite3
 
+from . import geocode
+
 
 def top_places(conn: sqlite3.Connection, limit: int = 20) -> list[dict]:
-    rows = conn.execute(
-        "SELECT id, gps_lat, gps_lon FROM photos "
-        "WHERE gps_lat IS NOT NULL AND gps_lon IS NOT NULL").fetchall()
-    if not rows:
-        return []
-    import reverse_geocoder as rg
-    # mode=1: single-threaded — the default uses multiprocessing, which breaks
-    # inside a Windows server thread
-    results = rg.search([(r["gps_lat"], r["gps_lon"]) for r in rows], mode=1)
-
     places: dict[str, dict] = {}
-    for r, res in zip(rows, results):
-        name = res["name"]
+    for r, name in geocode.photo_locations(conn):
         p = places.setdefault(name, {"count": 0, "lat_sum": 0.0, "lon_sum": 0.0})
         p["count"] += 1
         p["lat_sum"] += r["gps_lat"]

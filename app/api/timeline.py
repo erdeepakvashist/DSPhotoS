@@ -1,12 +1,15 @@
 """One paginated endpoint powers every photo grid (timeline, person, album,
 favorites, CLIP text search); filters combine."""
 import datetime
+import re
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from .. import clip_search
+from .. import clip_search, geocode
 from ..db import get_conn
+
+_LOCATION_QUERY_RE = re.compile(r"^(.*?)\s+in\s+(.+)$", re.IGNORECASE)
 
 router = APIRouter(prefix="/api")
 PAGE = 120
@@ -19,13 +22,18 @@ def timeline(cursor: str = "", person: int | None = None, album: int | None = No
 
     if query.strip():
         # CLIP search: relevance order, cursor = integer offset into ranked ids.
-        ranked = clip_search.search(conn, query.strip())
+        theme, place = _split_location_query(conn, query.strip())
+        ranked = clip_search.search(conn, theme)
+        if place:
+            cities = geocode.photo_cities(conn)
+            ranked = [pid for pid in ranked if cities.get(pid) == place]
         ranked = _apply_filters(conn, ranked, person, album, favorites)
         off = int(cursor) if cursor else 0
         page = ranked[off:off + PAGE]
         items = _photos_by_ids(conn, page)
         next_cursor = str(off + PAGE) if off + PAGE < len(ranked) else None
-        return {"items": items, "next_cursor": next_cursor, "mode": "search"}
+        return {"items": items, "next_cursor": next_cursor, "mode": "search",
+                "theme": theme if place else None, "place": place}
 
     where, params = ["1=1"], []
     if person:
@@ -95,6 +103,23 @@ def memories():
             continue  # only past years count as a "memory"
         by_year.setdefault(year, []).append(dict(r))
     return [{"year": y, "photos": by_year[y]} for y in sorted(by_year, reverse=True)]
+
+
+def _split_location_query(conn, query: str) -> tuple[str, str | None]:
+    """Parse queries like 'marriage in Ambala' into a CLIP theme part and a
+    location filter — but only if the trailing place actually matches a
+    geocoded location in the library, so an ordinary phrase that happens to
+    contain " in " (e.g. "kids playing in the rain") isn't misread as one."""
+    m = _LOCATION_QUERY_RE.match(query)
+    if not m:
+        return query, None
+    theme, place = m.group(1).strip(), m.group(2).strip()
+    if not theme or not place:
+        return query, None
+    cities = set(geocode.photo_cities(conn).values())
+    place_lower = place.lower()
+    match = next((c for c in cities if place_lower in c.lower() or c.lower() in place_lower), None)
+    return (theme, match) if match else (query, None)
 
 
 def _apply_filters(conn, ids: list[int], person, album, favorites) -> list[int]:

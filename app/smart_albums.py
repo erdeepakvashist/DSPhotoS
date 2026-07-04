@@ -37,9 +37,10 @@ TRIP_MIN_PHOTOS = 8
 
 
 def regenerate(conn: sqlite3.Connection):
+    from . import geocode
     conn.execute("DELETE FROM albums WHERE auto IS NOT NULL")
     _theme_albums(conn)
-    cities = _photo_cities(conn)
+    cities = geocode.photo_cities(conn)
     _place_albums(conn, cities)
     _trip_albums(conn, cities)
     conn.commit()
@@ -73,20 +74,7 @@ def _theme_albums(conn):
         _create(conn, name, f"theme:{name}", [int(i) for i in ids[mine][order]])
 
 
-# ---- places (offline reverse geocoding) ----
-
-def _photo_cities(conn) -> dict[int, str]:
-    """photo_id -> 'City' for every GPS-tagged photo."""
-    rows = conn.execute("SELECT id, gps_lat, gps_lon FROM photos "
-                        "WHERE gps_lat IS NOT NULL AND gps_lon IS NOT NULL").fetchall()
-    if not rows:
-        return {}
-    import reverse_geocoder as rg
-    # mode=1: single-threaded — the default uses multiprocessing, which breaks
-    # inside a Windows server thread
-    results = rg.search([(r["gps_lat"], r["gps_lon"]) for r in rows], mode=1)
-    return {r["id"]: res["name"] for r, res in zip(rows, results)}
-
+# ---- places (offline reverse geocoding via geocode.photo_cities) ----
 
 def _place_albums(conn, cities: dict[int, str]):
     by_city: dict[str, list[int]] = {}
