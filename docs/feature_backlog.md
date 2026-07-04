@@ -43,7 +43,11 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 6. **Quality scoring** — Laplacian-variance blur score computed per photo during
    scan (reusing the already-decoded RGB array, `photos.sharpness` column) and
    surfaced via a new `✨ Best` tab (`/api/best-shots`) sorted by sharpness. Also
-   used to pick the "keep" copy in duplicate groups (item 3).
+   used to pick the "keep" copy in duplicate groups (item 3). Photos indexed
+   before this existed have `sharpness IS NULL`; Settings > Scanning shows a
+   "Score existing photos for quality" button (`POST
+   /api/scan/backfill-sharpness`) that scores just those photos — reads +
+   computes only, no re-running face detection or CLIP.
 7. **Privacy blur** — `app/privacy.py` renders a pixelated copy of a photo
    (`GET /api/photos/{id}/share?mode=untagged|all`); the lightbox gained a
    🛡️ Share button offering "blur only unnamed faces" or "blur everyone".

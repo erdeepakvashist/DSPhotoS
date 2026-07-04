@@ -41,6 +41,19 @@ def start_scan() -> bool:
     return True
 
 
+def start_backfill_sharpness() -> bool:
+    """Score already-indexed photos for quality (sharpness) without re-running
+    face detection or CLIP embedding — for photos scanned before that scoring
+    existed. Returns False if a scan/backfill is already running."""
+    if STATUS["state"] in ("scanning", "stopping"):
+        return False
+    _stop.clear()
+    STATUS.update(state="scanning", phase="starting…", total=0, done=0, current="",
+                  new_photos=0, error="")
+    threading.Thread(target=_run_backfill_sharpness, daemon=True).start()
+    return True
+
+
 def _lower_thread_priority():
     """Workers run below normal priority so the web UI stays responsive while
     the CPU is saturated with inference."""
@@ -70,6 +83,41 @@ def _run_scan():
         except Exception as e:
             traceback.print_exc()
             STATUS.update(state="error", error=str(e))
+
+
+def _run_backfill_sharpness():
+    with _scan_lock:
+        try:
+            _backfill_sharpness()
+            STATUS["state"] = "idle"
+        except Exception as e:
+            traceback.print_exc()
+            STATUS.update(state="error", error=str(e))
+
+
+def _backfill_sharpness():
+    conn = get_conn()
+    rows = conn.execute("SELECT id, path FROM photos WHERE sharpness IS NULL").fetchall()
+    STATUS["total"] = len(rows)
+    STATUS["phase"] = "scoring photo quality…" if rows else ""
+
+    def score(row):
+        try:
+            img = ImageOps.exif_transpose(Image.open(row["path"]))
+            return row["id"], _sharpness(np.asarray(img.convert("RGB")))
+        except Exception:
+            return row["id"], None  # unreadable/missing file — leave unscored
+
+    with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
+        for pid, score_val in pool.map(score, rows):
+            if _stop.is_set():
+                break
+            if score_val is not None:
+                conn.execute("UPDATE photos SET sharpness=? WHERE id=?", (score_val, pid))
+            STATUS["done"] += 1
+            if STATUS["done"] % 20 == 0:
+                conn.commit()
+    conn.commit()
 
 
 def _scan():

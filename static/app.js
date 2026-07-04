@@ -170,6 +170,10 @@ function bindChrome() {
     try { await api.send("POST", "/api/scan/stop"); } catch (e) { /* not running */ }
     pollStatus();
   };
+  $("#backfill-btn").onclick = async () => {
+    try { await api.send("POST", "/api/scan/backfill-sharpness"); } catch (e) { /* already running */ }
+    pollStatus();
+  };
   $("#export-csv-btn").onclick = () => {
     const a = document.createElement("a");
     a.href = "/api/export/csv"; a.download = "";
@@ -828,6 +832,9 @@ async function pollStatus() {
   $("#index-stats").innerHTML =
     `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.faces}</b>faces</div>` +
     `<div><b>${s.stats.persons}</b>people</div><div><b>${s.stats.clusters}</b>unknown groups</div>`;
+  $("#backfill-row").classList.toggle("hidden", !s.stats.unscored || running);
+  $("#backfill-note").textContent = s.stats.unscored
+    ? `${s.stats.unscored} photo(s) scanned before quality scoring was added` : "";
 }
 
 /* ---------------- lightbox ---------------- */

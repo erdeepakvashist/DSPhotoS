@@ -108,6 +108,15 @@ def start_scan():
     return {"ok": True}
 
 
+@router.post("/scan/backfill-sharpness")
+def backfill_sharpness():
+    """Score already-indexed photos for quality without a full re-scan — for
+    photos indexed before quality scoring existed."""
+    if not scanner.start_backfill_sharpness():
+        raise HTTPException(409, "A scan is already running")
+    return {"ok": True}
+
+
 @router.post("/scan/stop")
 def stop_scan():
     if not scanner.stop_scan():
@@ -132,5 +141,7 @@ def scan_status():
         "clusters": conn.execute(
             "SELECT COUNT(DISTINCT cluster_id) c FROM faces "
             "WHERE cluster_id IS NOT NULL AND person_id IS NULL AND ignored=0").fetchone()["c"],
+        "unscored": conn.execute(
+            "SELECT COUNT(*) c FROM photos WHERE sharpness IS NULL").fetchone()["c"],
     }
     return {**scanner.STATUS, "stats": stats}
