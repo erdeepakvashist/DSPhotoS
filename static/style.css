@@ -41,7 +41,7 @@ body {
   position: sticky; top: 0; z-index: 30;
 }
 .logo { display: flex; align-items: center; gap: 10px; cursor: pointer; white-space: nowrap; }
-.logo-mark { font-size: 20px; filter: drop-shadow(0 2px 6px rgba(75,144,245,.5)); }
+.logo-mark { display: block; filter: drop-shadow(0 2px 6px rgba(75,144,245,.5)); }
 .logo-text { font-size: 17px; font-weight: 350; letter-spacing: .2px; }
 .logo-text b {
   font-weight: 700;
