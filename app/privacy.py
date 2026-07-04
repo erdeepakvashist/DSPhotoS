@@ -2,6 +2,7 @@
 machine, without ever touching the original file.
 """
 import io
+import os
 import sqlite3
 
 import cv2
@@ -14,7 +15,7 @@ def blurred_photo_bytes(conn: sqlite3.Connection, photo_id: int, mode: str = "un
     faces with no assigned person (protects bystanders, keeps named people
     visible); mode='all' blurs every detected face."""
     row = conn.execute("SELECT path FROM photos WHERE id=?", (photo_id,)).fetchone()
-    if not row:
+    if not row or not os.path.exists(row["path"]):
         return None
     img = Image.open(row["path"]).convert("RGB")
     from PIL import ImageOps
