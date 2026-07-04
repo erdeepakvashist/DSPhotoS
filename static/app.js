@@ -723,7 +723,9 @@ function formatDuration(sec) {
 }
 
 function openVideoPlayer(id) {
-  $("#video-player-el").src = "/media/video/" + id;
+  const v = $("#video-player-el");
+  v.poster = "/media/video-thumb/" + id;  // shows instantly while the video itself loads
+  v.src = "/media/video/" + id;
   $("#video-player").classList.remove("hidden");
 }
 
@@ -1091,15 +1093,40 @@ async function renderLightbox() {
   if (!it) return;
   resetLbZoom();
   const img = $("#lb-img");
-  img.src = "/media/photo/" + it.id;
+  img.style.width = ""; img.style.height = "";
   $("#lb-overlay").innerHTML = "";
+
+  if (it.width && it.height) {
+    // Fix the display box up front from data we already have (grid items
+    // carry width/height), so the cached thumbnail and the full-res image
+    // render at the same size — no jump when the swap below happens, and
+    // face boxes position correctly even before the full image arrives.
+    const scale = Math.min(window.innerWidth / it.width, window.innerHeight / it.height, 1);
+    img.style.width = Math.round(it.width * scale) + "px";
+    img.style.height = Math.round(it.height * scale) + "px";
+  }
+  // Thumbnail is already on disk (generated at scan time) — shows instantly
+  // while the full-resolution original loads in the background, which can
+  // be slow for large files or cloud-synced folders (e.g. OneDrive
+  // Files On-Demand needing to hydrate the file first).
+  img.classList.add("lb-loading");
+  img.src = "/media/thumb/" + it.id;
+  const full = new Image();
+  full.onload = () => {
+    if (state.items[state.lbIndex] !== it) return; // user already navigated away
+    img.src = full.src;
+    img.classList.remove("lb-loading");
+    positionFaceBoxes();
+  };
+  full.src = "/media/photo/" + it.id;
+
   const detail = await api.get("/api/photos/" + it.id);
   state.lbDetail = detail;
   it.favorite = detail.favorite;
   $("#lb-fav").textContent = detail.favorite ? "♥" : "♡";
   $("#lb-fav").classList.toggle("on", !!detail.favorite);
   $("#lb-faces").classList.toggle("on", state.lbFaces);
-  if (img.complete) positionFaceBoxes(); else img.onload = positionFaceBoxes;
+  positionFaceBoxes();
   lbWakeOverlay(); // show tags briefly on open/navigation, then fade
   renderInfoPanel(detail);
 }

@@ -36,16 +36,19 @@
   </div>
 </header>
 
+<div class="app-body">
 <nav class="tabs">
-  <a href="#photos"    data-tab="photos">Photos</a>
-  <a href="#videos"    data-tab="videos">🎬 Videos</a>
-  <a href="#best"      data-tab="best">✨ Best</a>
-  <a href="#people"    data-tab="people">People</a>
-  <a href="#unknown"   data-tab="unknown">Unknown <span id="unknown-badge" class="badge hidden"></span></a>
-  <a href="#duplicates" data-tab="duplicates">Duplicates <span id="dup-badge" class="badge hidden"></span></a>
-  <a href="#albums"    data-tab="albums">Albums</a>
-  <a href="#map"       data-tab="map">Map</a>
-  <a href="#settings"  data-tab="settings">Settings</a>
+  <a href="#photos"    data-tab="photos"><span class="tab-ico">🖼️</span>Photos</a>
+  <a href="#videos"    data-tab="videos"><span class="tab-ico">🎬</span>Videos</a>
+  <a href="#best"      data-tab="best"><span class="tab-ico">✨</span>Best</a>
+  <a href="#map"       data-tab="map"><span class="tab-ico">📍</span>Map</a>
+  <div class="tabs-section">Library</div>
+  <a href="#people"    data-tab="people"><span class="tab-ico">👤</span>People</a>
+  <a href="#unknown"   data-tab="unknown"><span class="tab-ico">❓</span>Unknown <span id="unknown-badge" class="badge hidden"></span></a>
+  <a href="#duplicates" data-tab="duplicates"><span class="tab-ico">🧹</span>Duplicates <span id="dup-badge" class="badge hidden"></span></a>
+  <a href="#albums"    data-tab="albums"><span class="tab-ico">📁</span>Albums</a>
+  <div class="tabs-spacer"></div>
+  <a href="#settings"  data-tab="settings"><span class="tab-ico">⚙️</span>Settings</a>
 </nav>
 
 <main id="main">
@@ -153,6 +156,7 @@
     </section>
   </div>
 </main>
+</div>
 
 <!-- selection action bar -->
 <div id="selbar" class="selbar hidden">
@@ -165,7 +169,7 @@
 <!-- video player -->
 <div id="video-player" class="video-player hidden">
   <button class="icon-btn video-player-close" id="video-player-close" title="Close (Esc)">✕</button>
-  <video id="video-player-el" controls></video>
+  <video id="video-player-el" controls preload="metadata"></video>
 </div>
 
 <!-- story / slideshow viewer -->
