@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import albums, people, photos, settings, timeline
+from .api import albums, facesearch, people, photos, settings, timeline
 from .db import init_db
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -13,7 +13,8 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 app = FastAPI(title="DS PhotoS")
 init_db()
 
-for r in (settings.router, timeline.router, people.router, albums.router, photos.router):
+for r in (settings.router, timeline.router, people.router, albums.router, photos.router,
+          facesearch.router):
     app.include_router(r)
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

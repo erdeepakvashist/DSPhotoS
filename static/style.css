@@ -62,6 +62,17 @@ body {
   background: var(--bg4); border-color: rgba(138,180,248,.45);
   box-shadow: 0 0 0 3px rgba(75,144,245,.15);
 }
+.searchbox input { padding-right: 46px; }
+.cam-btn {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
+  background: transparent; font-size: 16px; transition: background .15s;
+}
+.cam-btn:hover { background: var(--bg4); }
+#cam-video {
+  width: 440px; max-width: 78vw; border-radius: 12px; background: #000;
+  transform: scaleX(-1); /* mirror preview like a selfie camera */
+}
 .tabs {
   display: flex; gap: 2px; padding: 8px 14px;
   background: rgba(18,22,29,.85); backdrop-filter: blur(14px);

@@ -63,6 +63,10 @@ function route() {
   else if (name === "albums") { $("#view-albums").classList.remove("hidden"); loadAlbums(); }
   else if (name === "map") { $("#view-map").classList.remove("hidden"); loadMap(); }
   else if (name === "settings") { $("#view-settings").classList.remove("hidden"); loadSettings(); }
+  else if (name === "facesearch") {
+    $("#view-grid").classList.remove("hidden");
+    renderFaceResults();
+  }
   else {
     // photo grid variants: photos | person/<id> | album/<id> | favorites | search
     $("#view-grid").classList.remove("hidden");
@@ -83,6 +87,7 @@ function bindChrome() {
       location.hash = q ? "#search/" + encodeURIComponent(q) : "#photos";
     }
   });
+  $("#cam-btn").onclick = cameraSearch;
   $("#sel-clear").onclick = clearSelection;
   $("#sel-fav").onclick = favoriteSelection;
   $("#sel-album").onclick = () => pickAlbum([...state.selection]);
@@ -251,6 +256,84 @@ function observeSentinel() {
   sentinelObs = new IntersectionObserver((es) => es[0].isIntersecting && loadMore(),
     { rootMargin: "800px" });
   sentinelObs.observe($("#grid-sentinel"));
+}
+
+/* ---------------- camera face search ---------------- */
+let faceResults = null; // {person, items} from the last camera search
+
+async function cameraSearch() {
+  const box = $("#modal-box");
+  box.innerHTML = "<h3>📷 Search by face</h3>";
+  let stream = null;
+  const cleanup = () => { if (stream) stream.getTracks().forEach((t) => t.stop()); };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 1280 } },
+    });
+  } catch (e) {
+    box.innerHTML += `<p class="hint">Camera unavailable: ${e.message}</p>`;
+    const c = el("button", "btn ghost list-item", "Close");
+    c.onclick = closeModal;
+    box.appendChild(c);
+    $("#modal").classList.remove("hidden");
+    return;
+  }
+  const video = Object.assign(el("video"), { autoplay: true, playsInline: true, id: "cam-video" });
+  video.srcObject = stream;
+  const row = el("div", "row");
+  const snap = el("button", "btn primary", "📸 Capture & search");
+  const cancel = el("button", "btn ghost", "Cancel");
+  cancel.onclick = () => { cleanup(); closeModal(); };
+  snap.onclick = async () => {
+    const canvas = el("canvas");
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    cleanup();
+    box.innerHTML = "<h3>📷 Search by face</h3><p class='hint'>Looking for this face in your photos…</p>";
+    try {
+      const res = await api.send("POST", "/api/search/face",
+        { image: canvas.toDataURL("image/jpeg", 0.9) });
+      closeModal();
+      faceResults = res;
+      if (location.hash === "#facesearch") renderFaceResults();
+      else location.hash = "#facesearch";
+    } catch (e) {
+      box.innerHTML = `<h3>📷 Search by face</h3><p class="hint">${e.message}</p>`;
+      const c = el("button", "btn ghost list-item", "Close");
+      c.onclick = closeModal;
+      box.appendChild(c);
+    }
+  };
+  row.append(snap, cancel);
+  box.append(video, row);
+  $("#modal").classList.remove("hidden");
+}
+
+function renderFaceResults() {
+  const h = $("#grid-header");
+  $("#grid").innerHTML = "";
+  $("#grid").dataset.lastMonth = "";
+  $("#grid-empty").classList.add("hidden");
+  state.items = []; state.cursor = null; state.done = true; state.filters = {};
+  if (!faceResults) { location.hash = "#photos"; return; }
+  h.classList.remove("hidden");
+  h.innerHTML = "";
+  const retry = el("button", "btn", "📷 Try again");
+  retry.onclick = cameraSearch;
+  if (faceResults.error === "no_face") {
+    h.append(el("span", "", "No face detected in the capture"), retry);
+    return;
+  }
+  const who = faceResults.person ? `Looks like: ${faceResults.person}` : "Face search results";
+  h.append(el("span", "", who),
+           el("span", "sub", `${faceResults.items.length} matching photos`), retry);
+  if (!faceResults.items.length) {
+    const e = $("#grid-empty");
+    e.classList.remove("hidden");
+    e.textContent = "No matches found — try better lighting or a closer shot.";
+    return;
+  }
+  appendItems(faceResults.items, "search");
 }
 
 /* ---------------- selection ---------------- */
