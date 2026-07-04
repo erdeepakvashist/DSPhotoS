@@ -140,6 +140,11 @@ function bindChrome() {
     try { await api.send("POST", "/api/scan/stop"); } catch (e) { /* not running */ }
     pollStatus();
   };
+  $("#export-csv-btn").onclick = () => {
+    const a = document.createElement("a");
+    a.href = "/api/export/csv"; a.download = "";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
   $("#restart-app-btn").onclick = async () => {
     if (!confirm("Restart the app? A running scan will stop (it resumes on the next scan).")) return;
     try { await api.send("POST", "/api/app/restart"); } catch (e) {}

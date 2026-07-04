@@ -48,8 +48,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    (`GET /api/photos/{id}/share?mode=untagged|all`); the lightbox gained a
    🛡️ Share button offering "blur only unnamed faces" or "blur everyone".
    Downloads only — the original file is never touched.
-8. **Metadata export** — write person names + album names into EXIF/XMP
-   (piexif) or export a CSV, on demand from Settings.
+8. **Metadata export** — `app/export.py` exports a CSV (path, date, people,
+   albums, favorite, GPS) via a Settings button. Deliberately CSV-only, not
+   in-place EXIF/XMP writes — the README's "original files are never
+   modified" invariant rules that out.
 9. **Story sequences** — group each detected "trip"/day burst into an ordered
    recap sequence exposed via a lightweight viewer.
 10. **Search suggestions** — log query text, surface top recent/frequent

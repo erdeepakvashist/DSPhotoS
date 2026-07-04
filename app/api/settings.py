@@ -5,10 +5,10 @@ import sys
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from .. import scanner
+from .. import export, scanner
 from ..db import get_conn
 
 router = APIRouter(prefix="/api")
@@ -113,6 +113,13 @@ def stop_scan():
     if not scanner.stop_scan():
         raise HTTPException(409, "No scan running")
     return {"ok": True}
+
+
+@router.get("/export/csv")
+def export_csv():
+    csv_text = export.export_csv(get_conn())
+    return Response(content=csv_text, media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="dsphotos_metadata.csv"'})
 
 
 @router.get("/scan/status")
