@@ -14,17 +14,23 @@ A locally hosted, Google Photos-style web app for your own photo folders.
 - Everything stays on your machine. Original photo files are **never modified**;
   all tags live in `data/photos.db` (SQLite).
 
+## Install
+
+Double-click **`install.bat`**. It finds (or asks you to install) Python,
+creates a virtual environment, installs dependencies, and adds a **"DS PhotoS"**
+shortcut to your Desktop for one-click launching afterward.
+
 ## Run
 
 ```
 run.bat
 ```
 
-First run creates a virtualenv, installs dependencies, and downloads the AI models
-(~650 MB total, one time). Then open http://localhost:8000, go to **Settings**,
-add your photo folder(s), and click **Scan**.
+(or the Desktop shortcut created by the installer). First run also downloads
+the AI models (~650 MB total, one time). Then open http://localhost:8000, go
+to **Settings**, add your photo folder(s), and click **Scan**.
 
 ## Requirements
 
-- Windows, Python 3.12 (run.bat expects `%LOCALAPPDATA%\Programs\Python\Python312`)
+- Windows, Python 3.9+ (3.12 preferred)
 - No GPU needed (CPU inference; ~1-2 s per photo)
