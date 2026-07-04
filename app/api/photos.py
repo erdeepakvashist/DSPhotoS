@@ -18,20 +18,33 @@ class PhotoIdsIn(BaseModel):
 
 @router.get("/api/duplicates")
 def duplicates():
-    """Groups of near-identical photos (by CLIP similarity), best-resolution first."""
+    """Groups of near-identical photos (by CLIP similarity), sharpest first."""
     conn = get_conn()
     groups = dedup.find_duplicate_groups(conn)
     out = []
     for group in groups:
         qmarks = ",".join("?" * len(group))
         rows = {r["id"]: dict(r) for r in conn.execute(
-            f"SELECT id, taken_at, width, height, favorite FROM photos WHERE id IN ({qmarks})", group)}
+            f"SELECT id, taken_at, width, height, favorite, sharpness FROM photos "
+            f"WHERE id IN ({qmarks})", group)}
         photos = [rows[i] for i in group if i in rows]
-        photos.sort(key=lambda p: (p["width"] or 0) * (p["height"] or 0), reverse=True)
+        # prefer the sharpest copy; fall back to resolution when sharpness is
+        # unavailable (e.g. photos indexed before this scoring was added)
+        photos.sort(key=lambda p: (p["sharpness"] if p["sharpness"] is not None else -1,
+                                    (p["width"] or 0) * (p["height"] or 0)), reverse=True)
         if len(photos) > 1:
             out.append(photos)
     out.sort(key=len, reverse=True)
     return out
+
+
+@router.get("/api/best-shots")
+def best_shots(limit: int = 200):
+    """Sharpest-scoring photos in the library — a quick quality-based cut."""
+    conn = get_conn()
+    return [dict(r) for r in conn.execute(
+        "SELECT id, taken_at, width, height, favorite, sharpness FROM photos "
+        "WHERE sharpness IS NOT NULL ORDER BY sharpness DESC LIMIT ?", (limit,))]
 
 
 @router.post("/api/duplicates/archive")

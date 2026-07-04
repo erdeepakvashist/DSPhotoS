@@ -11,6 +11,7 @@ import traceback
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
+import cv2
 import numpy as np
 from PIL import Image, ImageOps, ExifTags
 
@@ -175,19 +176,31 @@ def _process_photo(path: str, mtime: float) -> dict:
         faces.append({"bbox": bbox, "det_score": f.det_score, "embedding": f.embedding,
                       "crop": thumbnails.face_crop_image(rgb, bbox)})
     clip_emb = clip_search.embed_image(img)
+    sharpness = _sharpness(rgb)
     return {"path": path, "mtime": mtime, "w": w, "h": h, "taken_at": taken_at,
             "lat": lat, "lon": lon, "camera": camera, "thumb": thumb,
-            "faces": faces, "clip": clip_emb}
+            "faces": faces, "clip": clip_emb, "sharpness": sharpness}
+
+
+def _sharpness(rgb: np.ndarray) -> float:
+    """Laplacian-variance blur score on a downscaled grayscale copy (higher =
+    sharper); cheap enough to run on every photo alongside face/CLIP inference."""
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    h, w = gray.shape[:2]
+    scale = 800 / max(h, w)
+    if scale < 1:
+        gray = cv2.resize(gray, (int(w * scale), int(h * scale)))
+    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
 
 def _store_photo(conn, r: dict, persons, clusters):
     """Scan thread: DB writes + matching (sequential), plus cheap JPEG saves."""
     conn.execute("DELETE FROM photos WHERE path=?", (r["path"],))  # re-index changed file
     photo_id = conn.execute(
-        "INSERT INTO photos(path, mtime, width, height, taken_at, gps_lat, gps_lon, camera) "
-        "VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO photos(path, mtime, width, height, taken_at, gps_lat, gps_lon, camera, sharpness) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
         (r["path"], r["mtime"], r["w"], r["h"], r["taken_at"], r["lat"], r["lon"],
-         r["camera"])).lastrowid
+         r["camera"], r["sharpness"])).lastrowid
     r["thumb"].save(thumbnails.thumb_path(photo_id), "JPEG", quality=82)
 
     for f in r["faces"]:

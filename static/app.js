@@ -56,6 +56,7 @@ function route() {
       (a.dataset.tab === "albums" && name === "album"));
   });
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+  $("#memories-strip").classList.add("hidden");
   clearSelection();
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
@@ -68,6 +69,10 @@ function route() {
     $("#view-grid").classList.remove("hidden");
     renderFaceResults();
   }
+  else if (name === "best") {
+    $("#view-grid").classList.remove("hidden");
+    renderBestShots();
+  }
   else {
     // photo grid variants: photos | person/<id> | album/<id> | favorites | search
     $("#view-grid").classList.remove("hidden");
@@ -77,7 +82,7 @@ function route() {
     if (name === "favorites") f.favorites = 1;
     if (name === "search") f.query = decodeURIComponent(arg || "");
     startGrid(f);
-    if (name === "photos" && !arg) loadMemories(); else $("#memories-strip").classList.add("hidden");
+    if (name === "photos" && !arg) loadMemories();
   }
 }
 
@@ -363,6 +368,26 @@ function renderFaceResults() {
     return;
   }
   appendItems(faceResults.items, "search");
+}
+
+async function renderBestShots() {
+  const h = $("#grid-header");
+  $("#grid").innerHTML = "";
+  $("#grid").dataset.lastMonth = "";
+  $("#grid-empty").classList.add("hidden");
+  state.items = []; state.cursor = null; state.done = true; state.filters = {};
+  const items = await api.get("/api/best-shots");
+  h.classList.remove("hidden");
+  h.innerHTML = "";
+  h.append(el("span", "", "✨ Best Shots"),
+           el("span", "sub", "Sharpest photos in your library, by blur-detection score"));
+  if (!items.length) {
+    const e = $("#grid-empty");
+    e.classList.remove("hidden");
+    e.textContent = "No scored photos yet — run a scan first.";
+    return;
+  }
+  appendItems(items, "search");
 }
 
 /* ---------------- selection ---------------- */

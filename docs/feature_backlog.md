@@ -40,8 +40,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    logic behind `/api/search/face` (factored into `_search_by_embedding`) but
    looks up an existing face's stored embedding instead of a camera capture.
    The lightbox face menu gained a "Find photos with this face" action.
-6. **Quality scoring** — Laplacian-variance blur + histogram exposure computed
-   during scan, stored per photo, surfaced as a sort/filter.
+6. **Quality scoring** — Laplacian-variance blur score computed per photo during
+   scan (reusing the already-decoded RGB array, `photos.sharpness` column) and
+   surfaced via a new `✨ Best` tab (`/api/best-shots`) sorted by sharpness. Also
+   used to pick the "keep" copy in duplicate groups (item 3).
 7. **Privacy blur** — endpoint to render a copy of a photo with untagged/all
    faces pixelated, for safe sharing.
 8. **Metadata export** — write person names + album names into EXIF/XMP
