@@ -31,7 +31,11 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    new `/api/duplicates` endpoint + UI panel to review. "Archive the others"
    moves non-kept copies into an `Archive` folder beside the originals
    (`app/archive.py`) — files are moved, never deleted, and the scanner skips
-   `Archive` folders so they don't come back.
+   `Archive` folders so they don't come back. Settings > Archive folder lets
+   the user instead pick one fixed destination for all archived photos
+   (`app_settings` key-value table, `GET/POST/DELETE /api/settings/archive-folder`);
+   the scanner skips that exact path too, wherever it lives, not just
+   folders literally named "Archive".
 4. **Location hotspots** — `app/hotspots.py` reverse-geocodes GPS EXIF into named
    places (reusing the same offline geocoder as smart_albums.py) and ranks them
    by photo count; the map view gets a "Top places" side panel plus
@@ -74,3 +78,38 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 12. **Face-level dedup** — within near-duplicate photo groups, prefer the photo
     whose faces have the highest `det_score` (sharpest) when suggesting which
     to keep.
+
+## Additional requests (post-backlog)
+
+| Request | Status | Commit |
+|---|---|---|
+| Sharpness backfill for pre-existing photos | ✅ | 60384e4 |
+| Configurable Archive folder (Settings) | ✅ | c850d65 |
+| Lightbox zoom (mouse wheel + drag-to-pan) | ✅ | 2ab348e |
+| Location-aware search ("marriage in Ambala") | ✅ | 2ab348e |
+| Videos tab (separate from Photos) | ✅ | (pending) |
+
+- **Lightbox zoom** — mouse wheel zooms in/out (1x–6x) anchored to the cursor
+  position via `translate()+scale()` math on `#lb-stage`; drag-to-pan once
+  zoomed in; double-click or navigating/closing resets zoom. Face-box overlay
+  stays aligned because it scales along with the image inside the same
+  transformed container.
+- **Location-aware search** — queries like "marriage in Ambala" are split into
+  a CLIP theme ("marriage") and a place ("Ambala"), matched against
+  reverse-geocoded photo locations (new shared `app/geocode.py`, factored out
+  of `smart_albums.py`/`hotspots.py`). The split only happens if the trailing
+  phrase actually matches a geocoded place in the library, so ordinary
+  queries containing " in " (e.g. "kids playing in the rain") aren't
+  misparsed. Falls back to a plain CLIP search otherwise.
+- **Videos tab** — new `videos` table (path, dimensions, duration, taken_at
+  from file mtime — no face/CLIP processing, no EXIF-based capture date yet)
+  populated by the scanner alongside photos in the same scan pass, sharing
+  its Archive-folder skip logic (`scanner._find_changed_files`, factored out
+  of the old photo-only walk). New `app/api/videos.py` serves a paginated
+  list, thumbnails (first-second video frame), and the video file itself —
+  Starlette's `FileResponse` handles Range requests natively, so seeking
+  works without extra code. A new 🎬 Videos tab shows a thumbnail grid with
+  duration badges; clicking opens a fullscreen native `<video controls>`
+  player. A "🔄 Scan for videos" button on the tab itself (not just Settings)
+  triggers the same unified scan and auto-refreshes the grid when it
+  finishes.

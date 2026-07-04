@@ -60,6 +60,7 @@ function route() {
   clearSelection();
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
+  else if (name === "videos") { $("#view-videos").classList.remove("hidden"); loadVideos(); }
   else if (name === "unknown") { $("#view-unknown").classList.remove("hidden"); loadClusters(); }
   else if (name === "duplicates") { $("#view-duplicates").classList.remove("hidden"); loadDuplicates(); }
   else if (name === "albums") { $("#view-albums").classList.remove("hidden"); loadAlbums(); }
@@ -162,6 +163,18 @@ function bindChrome() {
   $("#add-folder-btn").onclick = addFolder;
   $("#browse-folder-btn").onclick = browseFolder;
   $("#folder-input").addEventListener("keydown", (e) => e.key === "Enter" && addFolder());
+  $("#browse-archive-btn").onclick = browseArchiveFolder;
+  $("#save-archive-btn").onclick = saveArchiveFolder;
+  $("#reset-archive-btn").onclick = resetArchiveFolder;
+  $("#video-player-close").onclick = closeVideoPlayer;
+  $("#scan-videos-btn").onclick = async () => {
+    $("#video-scan-note").textContent = "Scanning…";
+    try { await api.send("POST", "/api/scan"); } catch (e) { $("#video-scan-note").textContent = "A scan is already running…"; }
+    pollStatus();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (!$("#video-player").classList.contains("hidden") && e.key === "Escape") closeVideoPlayer();
+  });
   $("#scan-btn").onclick = async () => {
     try { await api.send("POST", "/api/scan"); } catch (e) { /* already running */ }
     pollStatus();
@@ -271,6 +284,11 @@ async function loadMore() {
   state.done = !data.next_cursor;
   appendItems(data.items, data.mode);
   state.loading = false;
+  if (f.query && data.place) {
+    $("#grid-header").innerHTML = "";
+    $("#grid-header").append(el("span", "", `“${data.theme}” in ${data.place}`));
+    $("#grid-header").classList.remove("hidden");
+  }
   if (!state.items.length) {
     const e = $("#grid-empty");
     e.classList.remove("hidden");
@@ -431,6 +449,49 @@ async function renderBestShots() {
   appendItems(items, "search");
 }
 
+/* ---------------- story background music ---------------- */
+// "Carefree" by Kevin MacLeod (incompetech.com) — CC BY 4.0, credited in the story view.
+const storyMusic = { muted: false, fadeTimer: null };
+
+function startStoryMusic() {
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  audio.volume = 0;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+  const target = storyMusic.muted ? 0 : 0.55;
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = Math.min(target, audio.volume + 0.04);
+    if (audio.volume >= target) clearInterval(storyMusic.fadeTimer);
+  }, 60);
+}
+
+function stopStoryMusic() {
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = Math.max(0, audio.volume - 0.06);
+    if (audio.volume <= 0) {
+      clearInterval(storyMusic.fadeTimer);
+      audio.pause();
+    }
+  }, 60);
+}
+
+function toggleStoryMusicMute() {
+  storyMusic.muted = !storyMusic.muted;
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  const target = storyMusic.muted ? 0 : 0.55;
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = storyMusic.muted
+      ? Math.max(0, audio.volume - 0.06)
+      : Math.min(target, audio.volume + 0.06);
+    if (Math.abs(audio.volume - target) < 0.03) { audio.volume = target; clearInterval(storyMusic.fadeTimer); }
+  }, 60);
+  return storyMusic.muted;
+}
+
 /* ---------------- story / slideshow viewer ---------------- */
 const story = { photos: [], i: 0, timer: null, paused: false, slideMs: 3500 };
 
@@ -442,6 +503,7 @@ async function playStory(albumId) {
   renderStoryProgress();
   showStorySlide();
   bindStoryOnce();
+  startStoryMusic();
 }
 
 function renderStoryProgress() {
@@ -475,6 +537,7 @@ function prevStorySlide() {
 function closeStory() {
   clearTimeout(story.timer);
   $("#story-view").classList.add("hidden");
+  stopStoryMusic();
 }
 
 let storyBound = false;
@@ -488,6 +551,10 @@ function bindStoryOnce() {
     story.paused = !story.paused;
     $("#story-pause").textContent = story.paused ? "▶" : "⏸";
     if (story.paused) clearTimeout(story.timer); else showStorySlide();
+  };
+  $("#story-mute").onclick = () => {
+    const muted = toggleStoryMusicMute();
+    $("#story-mute").textContent = muted ? "🔈" : "🔊";
   };
   document.addEventListener("keydown", (e) => {
     if ($("#story-view").classList.contains("hidden")) return;
@@ -654,6 +721,84 @@ async function loadDuplicates() {
   }
 }
 
+/* ---------------- videos ---------------- */
+const videoState = { items: [], cursor: null, loading: false, done: false };
+
+async function loadVideos() {
+  videoState.items = []; videoState.cursor = null; videoState.done = false;
+  $("#video-grid").innerHTML = "";
+  $("#video-grid-empty").classList.add("hidden");
+  if (lastScanState !== "scanning" && lastScanState !== "stopping") $("#video-scan-note").textContent = "";
+  await loadMoreVideos();
+  observeVideoSentinel();
+}
+
+async function loadMoreVideos() {
+  if (videoState.loading || videoState.done) return;
+  videoState.loading = true;
+  const qs = new URLSearchParams();
+  if (videoState.cursor) qs.set("cursor", videoState.cursor);
+  const data = await api.get("/api/videos?" + qs);
+  videoState.cursor = data.next_cursor;
+  videoState.done = !data.next_cursor;
+  const grid = $("#video-grid");
+  for (const v of data.items) {
+    videoState.items.push(v);
+    grid.appendChild(videoTile(v));
+  }
+  videoState.loading = false;
+  if (!videoState.items.length) {
+    $("#video-grid-empty").classList.remove("hidden");
+    $("#video-grid-empty").textContent =
+      "No videos yet — add a folder with videos in Settings and run a scan.";
+  }
+}
+
+// Chrome/Edge on Windows can't decode HEVC without a separately-installed
+// codec extension — the video plays audio-only with no picture, which is
+// confusing without an explanation.
+const HEVC_CODECS = new Set(["hevc", "hvc1", "hev1", "h265"]);
+
+function videoTile(v) {
+  const d = el("div", "video-tile");
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.src = "/media/video-thumb/" + v.id;
+  d.append(img, el("span", "video-play", "▶"), el("span", "video-duration", formatDuration(v.duration)));
+  if (HEVC_CODECS.has(v.codec)) d.append(el("span", "video-warn", "⚠️ HEVC"));
+  d.onclick = () => openVideoPlayer(v.id, v.codec);
+  return d;
+}
+
+function formatDuration(sec) {
+  if (sec == null) return "";
+  sec = Math.round(sec);
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function openVideoPlayer(id, codec) {
+  const v = $("#video-player-el");
+  v.poster = "/media/video-thumb/" + id;  // shows instantly while the video itself loads
+  v.src = "/media/video/" + id;
+  $("#video-codec-warning").classList.toggle("hidden", !HEVC_CODECS.has(codec));
+  $("#video-player").classList.remove("hidden");
+}
+
+function closeVideoPlayer() {
+  const v = $("#video-player-el");
+  v.pause(); v.src = "";
+  $("#video-player").classList.add("hidden");
+}
+
+let videoSentinelObs = null;
+function observeVideoSentinel() {
+  if (videoSentinelObs) videoSentinelObs.disconnect();
+  videoSentinelObs = new IntersectionObserver((es) => es[0].isIntersecting && loadMoreVideos(),
+    { rootMargin: "800px" });
+  videoSentinelObs.observe($("#video-grid-sentinel"));
+}
+
 function updateUnknownBadge(n) {
   const b = $("#unknown-badge");
   b.classList.toggle("hidden", !n);
@@ -770,6 +915,32 @@ async function loadSettings() {
     li.append(el("span", "", f.path), rm);
     ul.appendChild(li);
   }
+  const arch = await api.get("/api/settings/archive-folder");
+  $("#archive-folder-input").value = arch.path || "";
+}
+
+async function browseArchiveFolder() {
+  const btn = $("#browse-archive-btn");
+  btn.disabled = true;
+  btn.textContent = "Choose the folder in the Windows dialog…";
+  try {
+    const r = await api.get("/api/pick-folder?title=" + encodeURIComponent("Choose an archive folder"));
+    if (r.path) $("#archive-folder-input").value = r.path;
+  } catch (e) { alert(e.message || "Could not open the folder dialog."); }
+  btn.disabled = false;
+  btn.textContent = "Browse…";
+}
+
+async function saveArchiveFolder() {
+  const path = $("#archive-folder-input").value.trim();
+  if (!path) return;
+  try { await api.send("POST", "/api/settings/archive-folder", { path }); loadSettings(); }
+  catch (e) { alert(e.message); }
+}
+
+async function resetArchiveFolder() {
+  await api.send("DELETE", "/api/settings/archive-folder");
+  loadSettings();
 }
 
 async function browseFolder() {
@@ -801,6 +972,7 @@ async function addFolder() {
 async function pollStatus() {
   let s;
   try { s = await api.get("/api/scan/status"); } catch { return; }
+  const wasRunning = lastScanState === "scanning" || lastScanState === "stopping";
   lastScanState = s.state;
   updateUnknownBadge(s.stats.clusters);
   const running = s.state === "scanning" || s.state === "stopping";
@@ -811,6 +983,11 @@ async function pollStatus() {
   if (running) {
     $("#scan-chip-text").textContent = s.state === "stopping" ? "Stopping…" :
       s.total ? `Scanning ${s.done}/${s.total}` : (s.phase || "Scanning…");
+  }
+
+  if (wasRunning && !running && state.route === "videos") {
+    $("#video-scan-note").textContent = s.new_videos ? `Found ${s.new_videos} new video(s).` : "No new videos found.";
+    loadVideos();
   }
 
   if (state.route !== "settings") return;
@@ -826,11 +1003,14 @@ async function pollStatus() {
   } else {
     prog.classList.add("hidden");
     $("#scan-btn").disabled = false;
+    const added = [s.new_photos && `${s.new_photos} photo(s)`, s.new_videos && `${s.new_videos} video(s)`]
+      .filter(Boolean).join(" and ");
     st.textContent = s.state === "error" ? "Scan error: " + s.error :
-      (s.new_photos ? `Last scan added ${s.new_photos} photos.` : "");
+      (added ? `Last scan added ${added}.` : "");
   }
   $("#index-stats").innerHTML =
-    `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.faces}</b>faces</div>` +
+    `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.videos}</b>videos</div>` +
+    `<div><b>${s.stats.faces}</b>faces</div>` +
     `<div><b>${s.stats.persons}</b>people</div><div><b>${s.stats.clusters}</b>unknown groups</div>`;
   $("#backfill-row").classList.toggle("hidden", !s.stats.unscored || running);
   $("#backfill-note").textContent = s.stats.unscored
@@ -857,6 +1037,12 @@ function bindLightbox() {
   $("#lb-faces").onclick = () => { state.lbFaces = !state.lbFaces; renderLightbox(); };
   $("#lb-share").onclick = shareSafely;
   $("#lb-info").onclick = () => $("#lb-panel").classList.toggle("hidden");
+  const stage = $("#lb-stage");
+  stage.addEventListener("wheel", lbWheelZoom, { passive: false });
+  stage.addEventListener("mousedown", lbDragStart);
+  document.addEventListener("mousemove", lbDragMove);
+  document.addEventListener("mouseup", lbDragEnd);
+  stage.addEventListener("dblclick", resetLbZoom);
   window.addEventListener("resize", () => !lbHidden() && positionFaceBoxes());
   document.addEventListener("keydown", (e) => {
     if (!$("#modal").classList.contains("hidden")) { if (e.key === "Escape") closeModal(); return; }
@@ -888,9 +1074,62 @@ async function openLightboxSingle(photoId) {
   renderLightbox();
 }
 
+/* ---------------- lightbox zoom (mouse wheel + drag-to-pan) ---------------- */
+const lbZoom = { scale: 1, tx: 0, ty: 0, dragging: false, lastX: 0, lastY: 0 };
+
+function resetLbZoom() {
+  lbZoom.scale = 1; lbZoom.tx = 0; lbZoom.ty = 0;
+  applyLbZoom();
+}
+
+function applyLbZoom() {
+  const stage = $("#lb-stage");
+  stage.style.transform = `translate(${lbZoom.tx}px, ${lbZoom.ty}px) scale(${lbZoom.scale})`;
+  stage.classList.toggle("zoomed", lbZoom.scale > 1);
+}
+
+function lbWheelZoom(e) {
+  e.preventDefault();
+  const rect = $("#lb-img").getBoundingClientRect();
+  // cursor position in the image's own (unscaled) coordinate space, so the
+  // point under the cursor stays fixed as the scale changes
+  const lx = (e.clientX - rect.left) / lbZoom.scale;
+  const ly = (e.clientY - rect.top) / lbZoom.scale;
+  const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+  const newScale = Math.min(6, Math.max(1, lbZoom.scale * factor));
+  if (newScale === lbZoom.scale) return;
+  lbZoom.tx += lx * (lbZoom.scale - newScale);
+  lbZoom.ty += ly * (lbZoom.scale - newScale);
+  lbZoom.scale = newScale;
+  if (lbZoom.scale === 1) { lbZoom.tx = 0; lbZoom.ty = 0; }
+  applyLbZoom();
+}
+
+function lbDragStart(e) {
+  if (lbZoom.scale <= 1) return;
+  lbZoom.dragging = true;
+  lbZoom.lastX = e.clientX; lbZoom.lastY = e.clientY;
+  $("#lb-stage").classList.add("dragging");
+  e.preventDefault();
+}
+
+function lbDragMove(e) {
+  if (!lbZoom.dragging) return;
+  lbZoom.tx += e.clientX - lbZoom.lastX;
+  lbZoom.ty += e.clientY - lbZoom.lastY;
+  lbZoom.lastX = e.clientX; lbZoom.lastY = e.clientY;
+  applyLbZoom();
+}
+
+function lbDragEnd() {
+  lbZoom.dragging = false;
+  $("#lb-stage").classList.remove("dragging");
+}
+
 function closeLightbox() {
   $("#lightbox").classList.add("hidden");
   $("#lb-panel").classList.add("hidden");
+  resetLbZoom();
 }
 
 async function stepLightbox(d) {
@@ -908,16 +1147,42 @@ async function stepLightbox(d) {
 async function renderLightbox() {
   const it = state.items[state.lbIndex];
   if (!it) return;
+  resetLbZoom();
   const img = $("#lb-img");
-  img.src = "/media/photo/" + it.id;
+  img.style.width = ""; img.style.height = "";
   $("#lb-overlay").innerHTML = "";
+
+  if (it.width && it.height) {
+    // Fix the display box up front from data we already have (grid items
+    // carry width/height), so the cached thumbnail and the full-res image
+    // render at the same size — no jump when the swap below happens, and
+    // face boxes position correctly even before the full image arrives.
+    const scale = Math.min(window.innerWidth / it.width, window.innerHeight / it.height, 1);
+    img.style.width = Math.round(it.width * scale) + "px";
+    img.style.height = Math.round(it.height * scale) + "px";
+  }
+  // Thumbnail is already on disk (generated at scan time) — shows instantly
+  // while the full-resolution original loads in the background, which can
+  // be slow for large files or cloud-synced folders (e.g. OneDrive
+  // Files On-Demand needing to hydrate the file first).
+  img.classList.add("lb-loading");
+  img.src = "/media/thumb/" + it.id;
+  const full = new Image();
+  full.onload = () => {
+    if (state.items[state.lbIndex] !== it) return; // user already navigated away
+    img.src = full.src;
+    img.classList.remove("lb-loading");
+    positionFaceBoxes();
+  };
+  full.src = "/media/photo/" + it.id;
+
   const detail = await api.get("/api/photos/" + it.id);
   state.lbDetail = detail;
   it.favorite = detail.favorite;
   $("#lb-fav").textContent = detail.favorite ? "♥" : "♡";
   $("#lb-fav").classList.toggle("on", !!detail.favorite);
   $("#lb-faces").classList.toggle("on", state.lbFaces);
-  if (img.complete) positionFaceBoxes(); else img.onload = positionFaceBoxes;
+  positionFaceBoxes();
   lbWakeOverlay(); // show tags briefly on open/navigation, then fade
   renderInfoPanel(detail);
 }
