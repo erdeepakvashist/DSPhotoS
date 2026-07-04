@@ -57,6 +57,7 @@ function route() {
   });
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
   $("#memories-strip").classList.add("hidden");
+  $("#year-scrubber").classList.add("hidden");
   clearSelection();
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
@@ -83,7 +84,7 @@ function route() {
     if (name === "favorites") f.favorites = 1;
     if (name === "search") f.query = decodeURIComponent(arg || "");
     startGrid(f);
-    if (name === "photos" && !arg) loadMemories();
+    if (name === "photos" && !arg) { loadMemories(); loadYearScrubber(); }
   }
 }
 
@@ -135,6 +136,58 @@ async function loadMemories() {
 function openMemoryPhoto(photos, photoId) {
   state.items = photos;
   openLightbox(photos.findIndex((p) => p.id === photoId));
+}
+
+/* ---------------- year scrubber ---------------- */
+async function loadYearScrubber() {
+  const box = $("#year-scrubber");
+  const years = await api.get("/api/timeline/years");
+  if (years.length < 2) { box.classList.add("hidden"); return; }
+  box.innerHTML = "";
+  for (const y of years) {
+    const seg = el("div", "year-seg");
+    seg.dataset.year = y.year;
+    seg.style.flexGrow = Math.sqrt(y.count);
+    seg.appendChild(el("span", "year-label", String(y.year)));
+    seg.onclick = () => jumpToYear(y.year);
+    box.appendChild(seg);
+  }
+  box.classList.remove("hidden");
+  bindYearScrubberScroll();
+}
+
+function jumpToYear(year) {
+  const cursor = `${year}-12-31 23:59:59|999999999999`;
+  startGrid({}, cursor);
+  $("main").scrollTop = 0;
+}
+
+let yearScrubberBound = false;
+function bindYearScrubberScroll() {
+  if (yearScrubberBound) return;
+  yearScrubberBound = true;
+  let ticking = false;
+  $("main").addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { highlightCurrentYear(); ticking = false; });
+  });
+}
+
+function highlightCurrentYear() {
+  if ($("#year-scrubber").classList.contains("hidden")) return;
+  const headers = document.querySelectorAll("#grid .month-h");
+  if (!headers.length) return;
+  const refY = $("main").getBoundingClientRect().top + 120;
+  let current = headers[0];
+  for (const h of headers) {
+    if (h.getBoundingClientRect().top <= refY) current = h;
+    else break;
+  }
+  const year = current.dataset.year;
+  document.querySelectorAll("#year-scrubber .year-seg").forEach((seg) => {
+    seg.classList.toggle("active", seg.dataset.year === year);
+  });
 }
 
 function bindChrome() {
@@ -209,12 +262,13 @@ function bindChrome() {
 }
 
 /* ---------------- photo grid ---------------- */
-async function startGrid(filters) {
+async function startGrid(filters, initialCursor) {
   state.filters = filters;
   state.items = [];
-  state.cursor = null;
+  state.cursor = initialCursor || null;
   state.done = false;
   $("#grid").innerHTML = "";
+  $("#grid").dataset.lastMonth = "";
   $("#grid-empty").classList.add("hidden");
   await renderGridHeader();
   await loadMore();
@@ -284,6 +338,7 @@ async function loadMore() {
   state.done = !data.next_cursor;
   appendItems(data.items, data.mode);
   state.loading = false;
+  highlightCurrentYear();
   if (f.query && data.place) {
     $("#grid-header").innerHTML = "";
     $("#grid-header").append(el("span", "", `“${data.theme}” in ${data.place}`));
@@ -306,7 +361,9 @@ function appendItems(items, mode) {
       const month = (it.taken_at || "").slice(0, 7);
       if (month !== lastMonth) {
         lastMonth = month;
-        grid.appendChild(el("div", "month-h", monthLabel(month)));
+        const h = el("div", "month-h", monthLabel(month));
+        h.dataset.year = month.slice(0, 4);
+        grid.appendChild(h);
         row = null;
       }
     }

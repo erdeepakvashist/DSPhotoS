@@ -87,7 +87,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 | Configurable Archive folder (Settings) | ✅ | c850d65 |
 | Lightbox zoom (mouse wheel + drag-to-pan) | ✅ | 2ab348e |
 | Location-aware search ("marriage in Ambala") | ✅ | 2ab348e |
-| Videos tab (separate from Photos) | ✅ | (pending) |
+| Videos tab (separate from Photos) | ✅ | 24ce31e |
+| Sidebar layout + light theme | ✅ | ab9094b |
+| HEVC codec detection/warning | ✅ | 54a548c |
+| Year scrubber on Photos tab | ✅ | (pending) |
 
 - **Lightbox zoom** — mouse wheel zooms in/out (1x–6x) anchored to the cursor
   position via `translate()+scale()` math on `#lb-stage`; drag-to-pan once
@@ -101,6 +104,13 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
   phrase actually matches a geocoded place in the library, so ordinary
   queries containing " in " (e.g. "kids playing in the rain") aren't
   misparsed. Falls back to a plain CLIP search otherwise.
+- **Year scrubber** — a fixed vertical strip on the right edge of the plain
+  Photos tab (Google Photos/Immich-style), segments sized by `sqrt(count)`
+  per year via `GET /api/timeline/years`. Clicking a year jumps straight to
+  it using a synthetic cursor (`"{year}-12-31 23:59:59|999999999999"` reuses
+  the existing cursor-pagination WHERE clause with no backend change needed);
+  scrolling the grid highlights the current year by checking `.month-h`
+  elements' `data-year` against a reference line near the top of `main`.
 - **Videos tab** — new `videos` table (path, dimensions, duration, taken_at
   from file mtime — no face/CLIP processing, no EXIF-based capture date yet)
   populated by the scanner alongside photos in the same scan pass, sharing

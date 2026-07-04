@@ -85,6 +85,16 @@ def search_suggestions(limit: int = 8):
     return [r["query"] for r in rows]
 
 
+@router.get("/timeline/years")
+def timeline_years():
+    """Photo counts per year, for the year-scrubber alongside the Photos grid."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT substr(taken_at,1,4) year, COUNT(*) c FROM photos "
+        "WHERE taken_at IS NOT NULL GROUP BY year ORDER BY year DESC").fetchall()
+    return [{"year": int(r["year"]), "count": r["c"]} for r in rows]
+
+
 @router.get("/memories")
 def memories():
     """Photos taken on today's month/day in previous years ('On This Day')."""
