@@ -7,31 +7,20 @@ echo   DS PhotoS - Installer
 echo ==============================================
 echo.
 
-rem --- Locate a usable Python (prefer 3.12) ---
-set "PYEXE="
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-)
-
+rem --- Step 1: make sure every dependency this installer needs is present ---
+rem Locate a usable Python (prefer 3.12); if none is found, install one
+rem automatically so this works on a bare machine with no intervention.
+call :find_python
 if not defined PYEXE (
-    py -3.12 -c "" >nul 2>&1
-    if !errorlevel! equ 0 set "PYEXE=py -3.12"
-)
-
-if not defined PYEXE (
-    py -3 -c "" >nul 2>&1
-    if !errorlevel! equ 0 set "PYEXE=py -3"
-)
-
-if not defined PYEXE (
-    where python >nul 2>&1
-    if !errorlevel! equ 0 set "PYEXE=python"
-)
-
-if not defined PYEXE (
-    echo Python was not found on this machine.
+    echo Python was not found - installing it automatically...
     echo.
+    call :install_python
+    call :find_python
+)
+
+if not defined PYEXE (
+    echo.
+    echo Automatic Python install did not succeed.
     echo Please install Python 3.12 from https://www.python.org/downloads/
     echo ^(check "Add python.exe to PATH" during setup^), then run install.bat again.
     echo.
@@ -41,6 +30,61 @@ if not defined PYEXE (
 
 echo Using Python: %PYEXE%
 echo.
+
+rem Best-effort: the Visual C++ runtime some wheels (onnxruntime/torch) need
+rem is preinstalled on nearly all Windows 10/11 machines; only try to add it
+rem if winget is available, and never fail the install if this step fails.
+where winget >nul 2>&1
+if !errorlevel! equ 0 (
+    winget install -e --id Microsoft.VCRedist.2015+.x64 --silent --accept-package-agreements --accept-source-agreements >nul 2>&1
+)
+
+goto :after_python_setup
+
+:find_python
+set "PYEXE="
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+    set "PYEXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+    exit /b 0
+)
+py -3.12 -c "" >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PYEXE=py -3.12"
+    exit /b 0
+)
+py -3 -c "" >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PYEXE=py -3"
+    exit /b 0
+)
+where python >nul 2>&1
+if !errorlevel! equ 0 (
+    set "PYEXE=python"
+    exit /b 0
+)
+exit /b 1
+
+:install_python
+rem Prefer winget (built into Windows 10 2004+ / Windows 11) for a trusted,
+rem fully silent install; fall back to downloading the official installer.
+where winget >nul 2>&1
+if !errorlevel! equ 0 (
+    winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
+    if !errorlevel! equ 0 exit /b 0
+)
+
+echo winget install unavailable or failed, downloading Python directly...
+set "PY_INSTALLER=%TEMP%\python-3.12-installer.exe"
+curl -fsSL -o "%PY_INSTALLER%" "https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
+if not exist "%PY_INSTALLER%" (
+    echo Download failed.
+    exit /b 1
+)
+start /wait "" "%PY_INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 Include_test=0
+del "%PY_INSTALLER%" >nul 2>&1
+exit /b 0
+
+:after_python_setup
 
 rem --- Guarantee a clean, empty photo database on every new install ---
 rem A fresh git clone never has a data\ folder (it's gitignored), so if one
