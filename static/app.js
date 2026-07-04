@@ -205,8 +205,10 @@ async function renderGridHeader() {
     const a = albums.find((x) => x.id === f.album);
     h.innerHTML = "";
     const back = el("button", "btn ghost", "←"); back.onclick = () => (location.hash = "#albums");
+    const play = el("button", "btn primary", "▶ Play as story");
+    play.onclick = () => playStory(f.album);
     h.append(back, el("span", "", a ? a.name : "Album"),
-             el("span", "sub", a ? `${a.photo_count} photos` : ""));
+             el("span", "sub", a ? `${a.photo_count} photos` : ""), play);
     h.classList.remove("hidden");
   } else if (f.favorites) {
     h.textContent = "♥ Favorites"; h.classList.remove("hidden");
@@ -393,6 +395,72 @@ async function renderBestShots() {
     return;
   }
   appendItems(items, "search");
+}
+
+/* ---------------- story / slideshow viewer ---------------- */
+const story = { photos: [], i: 0, timer: null, paused: false, slideMs: 3500 };
+
+async function playStory(albumId) {
+  const photos = await api.get(`/api/albums/${albumId}/photos`);
+  if (!photos.length) return;
+  story.photos = photos; story.i = 0; story.paused = false;
+  $("#story-view").classList.remove("hidden");
+  renderStoryProgress();
+  showStorySlide();
+  bindStoryOnce();
+}
+
+function renderStoryProgress() {
+  const bar = $("#story-progress");
+  bar.innerHTML = "";
+  story.photos.forEach((_, i) => {
+    const seg = el("div", "story-seg" + (i === story.i ? " active" : i < story.i ? " done" : ""));
+    bar.appendChild(seg);
+  });
+}
+
+function showStorySlide() {
+  $("#story-img").src = "/media/photo/" + story.photos[story.i].id;
+  renderStoryProgress();
+  clearTimeout(story.timer);
+  if (!story.paused) story.timer = setTimeout(nextStorySlide, story.slideMs);
+}
+
+function nextStorySlide() {
+  if (story.i >= story.photos.length - 1) { closeStory(); return; }
+  story.i++;
+  showStorySlide();
+}
+
+function prevStorySlide() {
+  if (story.i === 0) return;
+  story.i--;
+  showStorySlide();
+}
+
+function closeStory() {
+  clearTimeout(story.timer);
+  $("#story-view").classList.add("hidden");
+}
+
+let storyBound = false;
+function bindStoryOnce() {
+  if (storyBound) return;
+  storyBound = true;
+  $("#story-close").onclick = closeStory;
+  $("#story-next").onclick = nextStorySlide;
+  $("#story-prev").onclick = prevStorySlide;
+  $("#story-pause").onclick = () => {
+    story.paused = !story.paused;
+    $("#story-pause").textContent = story.paused ? "▶" : "⏸";
+    if (story.paused) clearTimeout(story.timer); else showStorySlide();
+  };
+  document.addEventListener("keydown", (e) => {
+    if ($("#story-view").classList.contains("hidden")) return;
+    if (e.key === "Escape") closeStory();
+    else if (e.key === "ArrowRight") nextStorySlide();
+    else if (e.key === "ArrowLeft") prevStorySlide();
+  });
 }
 
 /* ---------------- selection ---------------- */

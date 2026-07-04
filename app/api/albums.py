@@ -49,6 +49,17 @@ def delete_album(album_id: int):
     return {"ok": True}
 
 
+@router.get("/albums/{album_id}/photos")
+def album_photos(album_id: int):
+    """Full ordered photo list for an album — for the story/slideshow viewer,
+    which needs the whole sequence up front rather than paginated pages."""
+    conn = get_conn()
+    return [dict(r) for r in conn.execute(
+        "SELECT p.id, p.taken_at, p.width, p.height FROM photos p "
+        "JOIN album_photos ap ON ap.photo_id=p.id WHERE ap.album_id=? "
+        "ORDER BY p.taken_at, p.id", (album_id,))]
+
+
 @router.post("/albums/{album_id}/photos")
 def add_photos(album_id: int, body: PhotosIn):
     conn = get_conn()

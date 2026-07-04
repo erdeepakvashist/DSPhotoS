@@ -327,6 +327,26 @@ input[type=text], input[type=search] { font: inherit; }
 }
 #selbar-count { font-weight: 600; margin-right: 4px; }
 
+/* ---- story / slideshow ---- */
+.story-view {
+  position: fixed; inset: 0; background: #000; z-index: 6000;
+  display: flex; align-items: center; justify-content: center;
+}
+.story-view img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+}
+.story-progress {
+  position: absolute; top: 10px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 2;
+}
+.story-seg { flex: 1; height: 3px; background: rgba(255,255,255,.25); border-radius: 2px; }
+.story-seg.done { background: rgba(255,255,255,.7); }
+.story-seg.active { background: rgba(255,255,255,.95); }
+.story-close { position: absolute; top: 20px; right: 16px; z-index: 3; }
+.story-nav {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 14px; z-index: 3;
+}
+
 /* ---- lightbox ---- */
 .lightbox {
   /* above Leaflet's panes/controls (z-index up to ~1000) */

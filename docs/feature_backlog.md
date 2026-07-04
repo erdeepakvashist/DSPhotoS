@@ -52,8 +52,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    albums, favorite, GPS) via a Settings button. Deliberately CSV-only, not
    in-place EXIF/XMP writes — the README's "original files are never
    modified" invariant rules that out.
-9. **Story sequences** — group each detected "trip"/day burst into an ordered
-   recap sequence exposed via a lightweight viewer.
+9. **Story sequences** — trips/places are already grouped into albums by
+   smart_albums.py; added `GET /api/albums/{id}/photos` (full ordered list)
+   plus a "▶ Play as story" fullscreen auto-advancing slideshow (any album,
+   not just auto-generated ones), with progress segments and pause/prev/next.
 10. **Search suggestions** — log query text, surface top recent/frequent
     queries as autocomplete under the search box.
 11. **Mobile LAN upload** — `/upload` page + endpoint reachable from phone
