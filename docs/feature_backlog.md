@@ -19,7 +19,7 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 | 9 | Story sequences — auto day/trip recap albums | ⬜ | |
 | 10 | Personalized search suggestions | ⬜ | |
 | 11 | Mobile LAN photo upload | ⬜ | |
-| 12 | Smart face-level dedup (blurry duplicate face flagging) | ⬜ | |
+| 12 | Smart face-level dedup (blurry duplicate face flagging) | ✅ merged into 3+6 | 687025a |
 
 ## Notes per feature
 
@@ -44,8 +44,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    scan (reusing the already-decoded RGB array, `photos.sharpness` column) and
    surfaced via a new `✨ Best` tab (`/api/best-shots`) sorted by sharpness. Also
    used to pick the "keep" copy in duplicate groups (item 3).
-7. **Privacy blur** — endpoint to render a copy of a photo with untagged/all
-   faces pixelated, for safe sharing.
+7. **Privacy blur** — `app/privacy.py` renders a pixelated copy of a photo
+   (`GET /api/photos/{id}/share?mode=untagged|all`); the lightbox gained a
+   🛡️ Share button offering "blur only unnamed faces" or "blur everyone".
+   Downloads only — the original file is never touched.
 8. **Metadata export** — write person names + album names into EXIF/XMP
    (piexif) or export a CSV, on demand from Settings.
 9. **Story sequences** — group each detected "trip"/day burst into an ordered

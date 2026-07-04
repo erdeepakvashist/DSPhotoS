@@ -745,6 +745,7 @@ function bindLightbox() {
   $("#lb-fav").onclick = lbToggleFav;
   $("#lb-album").onclick = () => { const p = lbPhoto(); p && pickAlbum([p.id]); };
   $("#lb-faces").onclick = () => { state.lbFaces = !state.lbFaces; renderLightbox(); };
+  $("#lb-share").onclick = shareSafely;
   $("#lb-info").onclick = () => $("#lb-panel").classList.toggle("hidden");
   window.addEventListener("resize", () => !lbHidden() && positionFaceBoxes());
   document.addEventListener("keydown", (e) => {
@@ -875,6 +876,31 @@ async function faceMenu(face) {
   box.append(find, ign, cancel);
   $("#modal").classList.remove("hidden");
   inp.focus();
+}
+
+function shareSafely() {
+  const p = lbPhoto();
+  if (!p) return;
+  const box = $("#modal-box");
+  box.innerHTML = "<h3>🛡️ Share safely</h3><p class='hint'>Download a copy with faces pixelated, "
+    + "so bystanders aren't shared without consent. Your original file is never changed.</p>";
+  const untagged = el("button", "btn primary list-item", "Blur only unnamed faces");
+  untagged.onclick = () => { closeModal(); downloadShare(p.id, "untagged"); };
+  const all = el("button", "btn list-item", "Blur every face");
+  all.onclick = () => { closeModal(); downloadShare(p.id, "all"); };
+  const cancel = el("button", "btn ghost list-item", "Cancel");
+  cancel.onclick = closeModal;
+  box.append(untagged, all, cancel);
+  $("#modal").classList.remove("hidden");
+}
+
+function downloadShare(photoId, mode) {
+  const a = document.createElement("a");
+  a.href = `/api/photos/${photoId}/share?mode=${mode}`;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function renderInfoPanel(d) {

@@ -1,11 +1,11 @@
 """Photo detail, favorite toggle, map markers, and media serving."""
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from .. import archive, dedup, hotspots
+from .. import archive, dedup, hotspots, privacy
 from ..db import get_conn
 from ..thumbnails import face_path, thumb_path
 
@@ -98,6 +98,18 @@ def map_markers():
 def map_hotspots():
     """Named places ranked by photo count, for the 'Top places' panel on the map."""
     return hotspots.top_places(get_conn())
+
+
+@router.get("/api/photos/{photo_id}/share")
+def share_photo(photo_id: int, mode: str = "untagged"):
+    """A privacy-safe copy for sharing, with faces pixelated (see privacy.py)."""
+    if mode not in ("untagged", "all"):
+        raise HTTPException(400, "mode must be 'untagged' or 'all'")
+    data = privacy.blurred_photo_bytes(get_conn(), photo_id, mode)
+    if data is None:
+        raise HTTPException(404, "No such photo")
+    return Response(content=data, media_type="image/jpeg",
+                    headers={"Content-Disposition": f'attachment; filename="shared_{photo_id}.jpg"'})
 
 
 @router.get("/media/photo/{photo_id}")
