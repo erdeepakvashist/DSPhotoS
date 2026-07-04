@@ -38,17 +38,17 @@
 
 <div class="app-body">
 <nav class="tabs">
-  <a href="#photos"    data-tab="photos"><span class="tab-ico">🖼️</span>Photos</a>
-  <a href="#videos"    data-tab="videos"><span class="tab-ico">🎬</span>Videos</a>
-  <a href="#best"      data-tab="best"><span class="tab-ico">✨</span>Best</a>
-  <a href="#map"       data-tab="map"><span class="tab-ico">📍</span>Map</a>
+  <a href="#photos"    data-tab="photos"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16.5l-5.2-5.2a1.5 1.5 0 00-2.1 0L7 18"/></svg></span>Photos</a>
+  <a href="#videos"    data-tab="videos"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8.6v6.8l6-3.4z" fill="currentColor" stroke="none"/></svg></span>Videos</a>
+  <a href="#best"      data-tab="best"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.5c.9 4 3 6.1 7 7-4 .9-6.1 3-7 7-.9-4-3-6.1-7-7 4-.9 6.1-3 7-7z"/></svg></span>Best</a>
+  <a href="#map"       data-tab="map"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.4 7-12.4a7 7 0 00-14 0C5 13.6 12 21 12 21z"/><circle cx="12" cy="8.6" r="2.4"/></svg></span>Map</a>
   <div class="tabs-section">Library</div>
-  <a href="#people"    data-tab="people"><span class="tab-ico">👤</span>People</a>
-  <a href="#unknown"   data-tab="unknown"><span class="tab-ico">❓</span>Unknown <span id="unknown-badge" class="badge hidden"></span></a>
-  <a href="#duplicates" data-tab="duplicates"><span class="tab-ico">🧹</span>Duplicates <span id="dup-badge" class="badge hidden"></span></a>
-  <a href="#albums"    data-tab="albums"><span class="tab-ico">📁</span>Albums</a>
+  <a href="#people"    data-tab="people"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c0-4.1 3.6-6.5 7.5-6.5s7.5 2.4 7.5 6.5"/></svg></span>People</a>
+  <a href="#unknown"   data-tab="unknown"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 015.2.9c0 1.8-2.6 2.1-2.6 4"/><circle cx="12" cy="16.9" r=".2" fill="currentColor" stroke="none"/></svg></span>Unknown <span id="unknown-badge" class="badge hidden"></span></a>
+  <a href="#duplicates" data-tab="duplicates"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="12.5" height="12.5" rx="2"/><path d="M8 8V5.5a2 2 0 012-2h8.5a2 2 0 012 2V14a2 2 0 01-2 2H18"/></svg></span>Duplicates <span id="dup-badge" class="badge hidden"></span></a>
+  <a href="#albums"    data-tab="albums"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5a1.5 1.5 0 011.5-1.5h4l1.8 2h8.2a1.5 1.5 0 011.5 1.5v9.5a1.5 1.5 0 01-1.5 1.5H5a1.5 1.5 0 01-1.5-1.5z"/></svg></span>Albums</a>
   <div class="tabs-spacer"></div>
-  <a href="#settings"  data-tab="settings"><span class="tab-ico">⚙️</span>Settings</a>
+  <a href="#settings"  data-tab="settings"><span class="tab-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><line x1="12" y1="2.6" x2="12" y2="5.6"/><line x1="12" y1="18.4" x2="12" y2="21.4"/><line x1="2.6" y1="12" x2="5.6" y2="12"/><line x1="18.4" y1="12" x2="21.4" y2="12"/><line x1="5.2" y1="5.2" x2="7.3" y2="7.3"/><line x1="16.7" y1="16.7" x2="18.8" y2="18.8"/><line x1="18.8" y1="5.2" x2="16.7" y2="7.3"/><line x1="7.3" y1="16.7" x2="5.2" y2="18.8"/></svg></span>Settings</a>
 </nav>
 
 <main id="main">
@@ -169,6 +169,11 @@
 <!-- video player -->
 <div id="video-player" class="video-player hidden">
   <button class="icon-btn video-player-close" id="video-player-close" title="Close (Esc)">✕</button>
+  <div id="video-codec-warning" class="video-codec-warning hidden">
+    ⚠️ This video uses HEVC (H.265). Chrome/Edge on Windows can't decode it without an extra codec —
+    you may hear audio with no picture. Install "HEVC Video Extensions" from the Microsoft Store, or
+    open the original file directly in another player.
+  </div>
   <video id="video-player-el" controls preload="metadata"></video>
 </div>
 
@@ -182,6 +187,9 @@
     <button class="icon-btn" id="story-pause">⏸</button>
     <button class="icon-btn" id="story-next">›</button>
   </div>
+  <button class="icon-btn story-mute" id="story-mute" title="Mute music">🔊</button>
+  <div class="story-credit" title="Creative Commons — Attribution 4.0">🎵 Carefree — Kevin MacLeod (incompetech.com), CC BY 4.0</div>
+  <audio id="story-audio" src="/static/music/carefree.mp3" loop preload="none"></audio>
 </div>
 
 <!-- lightbox -->

@@ -23,7 +23,7 @@ def list_videos(cursor: str = ""):
         where.append("(taken_at < ? OR (taken_at = ? AND id < ?))")
         params += [taken, taken, int(vid)]
     rows = conn.execute(
-        f"SELECT id, taken_at, width, height, duration FROM videos "
+        f"SELECT id, taken_at, width, height, duration, codec FROM videos "
         f"WHERE {' AND '.join(where)} ORDER BY taken_at DESC, id DESC LIMIT {PAGE + 1}",
         params).fetchall()
     items = [dict(r) for r in rows[:PAGE]]

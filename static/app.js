@@ -449,6 +449,49 @@ async function renderBestShots() {
   appendItems(items, "search");
 }
 
+/* ---------------- story background music ---------------- */
+// "Carefree" by Kevin MacLeod (incompetech.com) — CC BY 4.0, credited in the story view.
+const storyMusic = { muted: false, fadeTimer: null };
+
+function startStoryMusic() {
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  audio.volume = 0;
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+  const target = storyMusic.muted ? 0 : 0.55;
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = Math.min(target, audio.volume + 0.04);
+    if (audio.volume >= target) clearInterval(storyMusic.fadeTimer);
+  }, 60);
+}
+
+function stopStoryMusic() {
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = Math.max(0, audio.volume - 0.06);
+    if (audio.volume <= 0) {
+      clearInterval(storyMusic.fadeTimer);
+      audio.pause();
+    }
+  }, 60);
+}
+
+function toggleStoryMusicMute() {
+  storyMusic.muted = !storyMusic.muted;
+  const audio = $("#story-audio");
+  clearInterval(storyMusic.fadeTimer);
+  const target = storyMusic.muted ? 0 : 0.55;
+  storyMusic.fadeTimer = setInterval(() => {
+    audio.volume = storyMusic.muted
+      ? Math.max(0, audio.volume - 0.06)
+      : Math.min(target, audio.volume + 0.06);
+    if (Math.abs(audio.volume - target) < 0.03) { audio.volume = target; clearInterval(storyMusic.fadeTimer); }
+  }, 60);
+  return storyMusic.muted;
+}
+
 /* ---------------- story / slideshow viewer ---------------- */
 const story = { photos: [], i: 0, timer: null, paused: false, slideMs: 3500 };
 
@@ -460,6 +503,7 @@ async function playStory(albumId) {
   renderStoryProgress();
   showStorySlide();
   bindStoryOnce();
+  startStoryMusic();
 }
 
 function renderStoryProgress() {
@@ -493,6 +537,7 @@ function prevStorySlide() {
 function closeStory() {
   clearTimeout(story.timer);
   $("#story-view").classList.add("hidden");
+  stopStoryMusic();
 }
 
 let storyBound = false;
@@ -506,6 +551,10 @@ function bindStoryOnce() {
     story.paused = !story.paused;
     $("#story-pause").textContent = story.paused ? "▶" : "⏸";
     if (story.paused) clearTimeout(story.timer); else showStorySlide();
+  };
+  $("#story-mute").onclick = () => {
+    const muted = toggleStoryMusicMute();
+    $("#story-mute").textContent = muted ? "🔈" : "🔊";
   };
   document.addEventListener("keydown", (e) => {
     if ($("#story-view").classList.contains("hidden")) return;
@@ -705,13 +754,19 @@ async function loadMoreVideos() {
   }
 }
 
+// Chrome/Edge on Windows can't decode HEVC without a separately-installed
+// codec extension — the video plays audio-only with no picture, which is
+// confusing without an explanation.
+const HEVC_CODECS = new Set(["hevc", "hvc1", "hev1", "h265"]);
+
 function videoTile(v) {
   const d = el("div", "video-tile");
   const img = document.createElement("img");
   img.loading = "lazy";
   img.src = "/media/video-thumb/" + v.id;
   d.append(img, el("span", "video-play", "▶"), el("span", "video-duration", formatDuration(v.duration)));
-  d.onclick = () => openVideoPlayer(v.id);
+  if (HEVC_CODECS.has(v.codec)) d.append(el("span", "video-warn", "⚠️ HEVC"));
+  d.onclick = () => openVideoPlayer(v.id, v.codec);
   return d;
 }
 
@@ -722,10 +777,11 @@ function formatDuration(sec) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function openVideoPlayer(id) {
+function openVideoPlayer(id, codec) {
   const v = $("#video-player-el");
   v.poster = "/media/video-thumb/" + id;  // shows instantly while the video itself loads
   v.src = "/media/video/" + id;
+  $("#video-codec-warning").classList.toggle("hidden", !HEVC_CODECS.has(codec));
   $("#video-player").classList.remove("hidden");
 }
 

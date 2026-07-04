@@ -233,6 +233,9 @@ def _scan():
                         traceback.print_exc()
                 STATUS["done"] += 1
 
+    if not _stop.is_set():
+        _backfill_video_codec(conn)
+
     matching._drop_empty_clusters(conn)
     conn.commit()
     if STATUS["new_photos"] or photo_gone:
@@ -315,6 +318,8 @@ def _video_metadata(path: str) -> dict | None:
     fps = cap.get(cv2.CAP_PROP_FPS) or 0
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
     duration = (frame_count / fps) if fps > 0 else None
+    fourcc_int = int(cap.get(cv2.CAP_PROP_FOURCC))
+    codec = "".join(chr((fourcc_int >> 8 * i) & 0xFF) for i in range(4)).strip().lower() or None
     # a frame ~1s in is a more representative thumbnail than frame 0 (often
     # black, or a lens cap) when the video is long enough to have one
     if fps and frame_count > fps:
@@ -324,16 +329,38 @@ def _video_metadata(path: str) -> dict | None:
     if not ok:
         return None
     thumb = thumbnails.thumb_image(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
-    return {"width": width, "height": height, "duration": duration, "thumb": thumb}
+    return {"width": width, "height": height, "duration": duration, "codec": codec, "thumb": thumb}
 
 
 def _store_video(conn, path: str, mtime: float, meta: dict):
     conn.execute("DELETE FROM videos WHERE path=?", (path,))  # re-index changed file
     taken_at = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
     video_id = conn.execute(
-        "INSERT INTO videos(path, mtime, width, height, duration, taken_at) VALUES (?,?,?,?,?,?)",
-        (path, mtime, meta["width"], meta["height"], meta["duration"], taken_at)).lastrowid
+        "INSERT INTO videos(path, mtime, width, height, duration, taken_at, codec) VALUES (?,?,?,?,?,?,?)",
+        (path, mtime, meta["width"], meta["height"], meta["duration"], taken_at, meta["codec"])).lastrowid
     meta["thumb"].save(thumbnails.video_thumb_path(video_id), "JPEG", quality=82)
+    conn.commit()
+
+
+def _backfill_video_codec(conn):
+    """Fill in codec for videos indexed before that field existed, without
+    disturbing their id/thumbnail (a full re-index would cascade-delete any
+    faces/embeddings tied to that video_id) — just probes and UPDATEs."""
+    rows = conn.execute("SELECT id, path FROM videos WHERE codec IS NULL").fetchall()
+    for r in rows:
+        if _stop.is_set():
+            break
+        if not os.path.exists(r["path"]):
+            continue
+        cap = cv2.VideoCapture(r["path"])
+        if not cap.isOpened():
+            cap.release()
+            continue
+        fourcc_int = int(cap.get(cv2.CAP_PROP_FOURCC))
+        cap.release()
+        codec = "".join(chr((fourcc_int >> 8 * i) & 0xFF) for i in range(4)).strip().lower() or None
+        if codec:
+            conn.execute("UPDATE videos SET codec=? WHERE id=?", (codec, r["id"]))
     conn.commit()
 
 

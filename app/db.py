@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS videos (
     duration REAL,              -- seconds
     taken_at TEXT,               -- ISO 'YYYY-MM-DD HH:MM:SS' (from file mtime)
     gps_lat REAL, gps_lon REAL,  -- best-effort, from QuickTime '\xa9xyz' atom if present
+    codec TEXT,                  -- fourcc, e.g. 'h264', 'hevc' — hevc often has no picture
+                                  -- in Chrome/Edge without a codec extension (audio still plays)
     scanned_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_videos_taken ON videos(taken_at DESC, id DESC);
@@ -154,7 +156,8 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # column already present
     for stmt in ("ALTER TABLE videos ADD COLUMN gps_lat REAL",
-                 "ALTER TABLE videos ADD COLUMN gps_lon REAL"):
+                 "ALTER TABLE videos ADD COLUMN gps_lon REAL",
+                 "ALTER TABLE videos ADD COLUMN codec TEXT"):
         try:
             conn.execute(stmt)
         except sqlite3.OperationalError:
