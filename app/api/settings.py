@@ -59,7 +59,7 @@ def list_folders():
 
 @router.post("/folders")
 def add_folder(body: FolderIn):
-    path = os.path.normpath(body.path.strip().strip('"'))
+    path = os.path.realpath(os.path.normpath(body.path.strip().strip('"')))
     if not os.path.isdir(path):
         raise HTTPException(400, f"Not a folder: {path}")
     conn = get_conn()

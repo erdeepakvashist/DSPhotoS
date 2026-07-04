@@ -12,11 +12,11 @@ FACE_MARGIN = 0.35  # extra context around the bbox
 
 
 def thumb_path(photo_id: int) -> Path:
-    return THUMBS_DIR / f"{photo_id}.jpg"
+    return THUMBS_DIR / f"{int(photo_id)}.jpg"
 
 
 def face_path(face_id: int) -> Path:
-    return FACES_DIR / f"{face_id}.jpg"
+    return FACES_DIR / f"{int(face_id)}.jpg"
 
 
 def thumb_image(img: Image.Image) -> Image.Image:
