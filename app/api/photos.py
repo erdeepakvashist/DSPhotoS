@@ -3,11 +3,47 @@ import os
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
+from .. import archive, dedup
 from ..db import get_conn
 from ..thumbnails import face_path, thumb_path
 
 router = APIRouter()
+
+
+class PhotoIdsIn(BaseModel):
+    photo_ids: list[int]
+
+
+@router.get("/api/duplicates")
+def duplicates():
+    """Groups of near-identical photos (by CLIP similarity), best-resolution first."""
+    conn = get_conn()
+    groups = dedup.find_duplicate_groups(conn)
+    out = []
+    for group in groups:
+        qmarks = ",".join("?" * len(group))
+        rows = {r["id"]: dict(r) for r in conn.execute(
+            f"SELECT id, taken_at, width, height, favorite FROM photos WHERE id IN ({qmarks})", group)}
+        photos = [rows[i] for i in group if i in rows]
+        photos.sort(key=lambda p: (p["width"] or 0) * (p["height"] or 0), reverse=True)
+        if len(photos) > 1:
+            out.append(photos)
+    out.sort(key=len, reverse=True)
+    return out
+
+
+@router.post("/api/duplicates/archive")
+def archive_duplicates(body: PhotoIdsIn):
+    """Move the given photos' files into an 'Archive' folder beside their
+    originals for the user to review/delete themselves; never deletes files."""
+    conn = get_conn()
+    archived, failed = [], []
+    for pid in body.photo_ids:
+        dest = archive.archive_photo(conn, pid)
+        (archived if dest else failed).append(pid)
+    return {"archived": archived, "failed": failed}
 
 
 @router.get("/api/photos/{photo_id}")

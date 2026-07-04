@@ -80,7 +80,10 @@ def _scan():
     known = {r["path"]: r["mtime"] for r in conn.execute("SELECT path, mtime FROM photos")}
     todo, seen = [], set()
     for root in folders:
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            # "Archive" holds photos the user moved out of the library (e.g. via
+            # duplicate cleanup) — never re-index them.
+            dirnames[:] = [d for d in dirnames if d.lower() != "archive"]
             for fn in filenames:
                 if os.path.splitext(fn)[1].lower() not in IMAGE_EXTS:
                     continue

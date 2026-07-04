@@ -60,6 +60,7 @@ function route() {
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
   else if (name === "unknown") { $("#view-unknown").classList.remove("hidden"); loadClusters(); }
+  else if (name === "duplicates") { $("#view-duplicates").classList.remove("hidden"); loadDuplicates(); }
   else if (name === "albums") { $("#view-albums").classList.remove("hidden"); loadAlbums(); }
   else if (name === "map") { $("#view-map").classList.remove("hidden"); loadMap(); }
   else if (name === "settings") { $("#view-settings").classList.remove("hidden"); loadSettings(); }
@@ -477,6 +478,47 @@ async function loadClusters() {
     tag.append(inp, btn);
     div.append(pile, meta, tag);
     list.appendChild(div);
+  }
+}
+
+/* ---------------- duplicates ---------------- */
+async function loadDuplicates() {
+  const groups = await api.get("/api/duplicates");
+  const list = $("#duplicate-list");
+  const empty = $("#duplicates-empty");
+  list.innerHTML = "";
+  $("#dup-badge").classList.toggle("hidden", !groups.length);
+  $("#dup-badge").textContent = groups.length;
+  if (!groups.length) {
+    empty.textContent = "No near-duplicate photos found 🎉";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  for (const group of groups) {
+    const card = el("div", "cluster");
+    const pile = el("div", "facepile");
+    group.forEach((p, i) => {
+      const wrap = el("div", "dup-thumb");
+      const img = document.createElement("img");
+      img.src = "/media/thumb/" + p.id;
+      img.onclick = () => openLightboxSingle(p.id);
+      wrap.appendChild(img);
+      if (i === 0) wrap.appendChild(el("span", "dup-keep", "★ Keep"));
+      pile.appendChild(wrap);
+    });
+    const meta = el("div", "meta", `${group.length} similar photos`);
+    const archiveBtn = el("button", "btn danger", `Archive the other ${group.length - 1}`);
+    archiveBtn.onclick = async () => {
+      const ids = group.slice(1).map((p) => p.id);
+      if (!confirm(`Move ${ids.length} photo(s) into an "Archive" folder next to the originals? `
+        + `Files are moved, not deleted — you can review and delete them yourself later.`)) return;
+      archiveBtn.disabled = true;
+      await api.send("POST", "/api/duplicates/archive", { photo_ids: ids });
+      loadDuplicates();
+    };
+    card.append(pile, meta, archiveBtn);
+    list.appendChild(card);
   }
 }
 

@@ -39,6 +39,7 @@
   <a href="#photos"    data-tab="photos">Photos</a>
   <a href="#people"    data-tab="people">People</a>
   <a href="#unknown"   data-tab="unknown">Unknown <span id="unknown-badge" class="badge hidden"></span></a>
+  <a href="#duplicates" data-tab="duplicates">Duplicates <span id="dup-badge" class="badge hidden"></span></a>
   <a href="#albums"    data-tab="albums">Albums</a>
   <a href="#map"       data-tab="map">Map</a>
   <a href="#settings"  data-tab="settings">Settings</a>
@@ -59,6 +60,14 @@
     <p class="hint">Groups of similar faces the app couldn't identify. Type a name to tag
       the whole group — matching faces elsewhere will be tagged automatically.</p>
     <div id="cluster-list"></div>
+  </div>
+
+  <div id="view-duplicates" class="view hidden">
+    <p class="hint">Photos that look nearly identical, grouped together. The sharpest/highest-resolution
+      copy is marked ★ Keep. Archiving moves the others into an "Archive" folder next to the originals
+      — nothing is ever deleted automatically; review and delete them yourself when ready.</p>
+    <div id="duplicate-list"></div>
+    <div id="duplicates-empty" class="empty hidden"></div>
   </div>
 
   <div id="view-albums" class="view hidden">

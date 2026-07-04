@@ -10,7 +10,7 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 |---|---------|--------|--------|
 | 1 | Expanded smart albums (pets, selfies, sunsets, indoor/outdoor, groups) | ⬜ | |
 | 2 | "On This Day" memory timeline | ⬜ | |
-| 3 | Duplicate & near-duplicate photo detection | ⬜ | |
+| 3 | Duplicate & near-duplicate photo detection + Archive cleanup | ⬜ | |
 | 4 | Location hotspot clustering (map view) | ⬜ | |
 | 5 | Search by face — click any face in the lightbox | ⬜ | |
 | 6 | Automated photo quality scoring (blur/exposure) | ⬜ | |
@@ -28,7 +28,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 2. **On This Day** — new `/api/on-this-day` endpoint using `taken_at` month/day
    match across years; UI card on the Photos tab.
 3. **Duplicates** — cosine-similarity clustering over existing `clip_embeddings`;
-   new `/api/duplicates` endpoint + UI panel to review/delete.
+   new `/api/duplicates` endpoint + UI panel to review. "Archive the others"
+   moves non-kept copies into an `Archive` folder beside the originals
+   (`app/archive.py`) — files are moved, never deleted, and the scanner skips
+   `Archive` folders so they don't come back.
 4. **Location hotspots** — cluster GPS points (grid/geohash) server-side, surface
    as marker clusters/heat circles on the existing Leaflet map.
 5. **Search by face** — lightbox face boxes become clickable, reusing
