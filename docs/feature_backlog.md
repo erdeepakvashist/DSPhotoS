@@ -36,8 +36,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    places (reusing the same offline geocoder as smart_albums.py) and ranks them
    by photo count; the map view gets a "Top places" side panel plus
    density circles sized by `sqrt(count)`.
-5. **Search by face** — lightbox face boxes become clickable, reusing
-   `matching`/embedding search already backing `/api/search/face`.
+5. **Search by face** — new `GET /api/faces/{id}/similar` reuses the ranking
+   logic behind `/api/search/face` (factored into `_search_by_embedding`) but
+   looks up an existing face's stored embedding instead of a camera capture.
+   The lightbox face menu gained a "Find photos with this face" action.
 6. **Quality scoring** — Laplacian-variance blur + histogram exposure computed
    during scan, stored per photo, surfaced as a sort/filter.
 7. **Privacy blur** — endpoint to render a copy of a photo with untagged/all

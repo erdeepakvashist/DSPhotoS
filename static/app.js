@@ -834,6 +834,12 @@ async function faceMenu(face) {
     };
     box.appendChild(clr);
   }
+  const find = el("button", "btn list-item", "🔍 Find photos with this face");
+  find.onclick = async () => {
+    closeModal();
+    faceResults = await api.get(`/api/faces/${face.id}/similar`);
+    location.hash = "#facesearch";
+  };
   const ign = el("button", "btn danger list-item", "Not a face / ignore");
   ign.onclick = async () => {
     await api.send("POST", `/api/faces/${face.id}/ignore`);
@@ -841,7 +847,7 @@ async function faceMenu(face) {
   };
   const cancel = el("button", "btn ghost list-item", "Cancel");
   cancel.onclick = closeModal;
-  box.append(ign, cancel);
+  box.append(find, ign, cancel);
   $("#modal").classList.remove("hidden");
   inp.focus();
 }
