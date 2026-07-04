@@ -1,6 +1,6 @@
 # DS PhotoS
 
-A locally hosted, Google Photos-style web app for your own photo folders.
+A locally hosted, Smart photo search web app for your own photo folders.
 
 - **Face search & tagging** — every face in every photo is detected and embedded
   (InsightFace buffalo_l models via onnxruntime, CPU). Photos with multiple people
