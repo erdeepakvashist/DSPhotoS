@@ -38,6 +38,7 @@
 
 <nav class="tabs">
   <a href="#photos"    data-tab="photos">Photos</a>
+  <a href="#videos"    data-tab="videos">🎬 Videos</a>
   <a href="#best"      data-tab="best">✨ Best</a>
   <a href="#people"    data-tab="people">People</a>
   <a href="#unknown"   data-tab="unknown">Unknown <span id="unknown-badge" class="badge hidden"></span></a>
@@ -54,6 +55,16 @@
     <div id="grid"></div>
     <div id="grid-sentinel"></div>
     <div id="grid-empty" class="empty hidden"></div>
+  </div>
+
+  <div id="view-videos" class="view hidden">
+    <div class="toolbar">
+      <button id="scan-videos-btn" class="btn">🔄 Scan for videos</button>
+      <span id="video-scan-note" class="hint"></span>
+    </div>
+    <div id="video-grid" class="video-grid"></div>
+    <div id="video-grid-sentinel"></div>
+    <div id="video-grid-empty" class="empty hidden"></div>
   </div>
 
   <div id="view-people" class="view hidden"><div id="people-grid" class="cards"></div></div>
@@ -149,6 +160,12 @@
   <button class="btn" id="sel-album">Add to album</button>
   <button class="btn" id="sel-fav">♥ Favorite</button>
   <button class="btn ghost" id="sel-clear">Cancel</button>
+</div>
+
+<!-- video player -->
+<div id="video-player" class="video-player hidden">
+  <button class="icon-btn video-player-close" id="video-player-close" title="Close (Esc)">✕</button>
+  <video id="video-player-el" controls></video>
 </div>
 
 <!-- story / slideshow viewer -->

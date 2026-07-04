@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageOps
 
-from .db import THUMBS_DIR, FACES_DIR
+from .db import THUMBS_DIR, FACES_DIR, VIDEO_THUMBS_DIR
 
 THUMB_SIZE = 400
 FACE_SIZE = 180
@@ -17,6 +17,10 @@ def thumb_path(photo_id: int) -> Path:
 
 def face_path(face_id: int) -> Path:
     return FACES_DIR / f"{int(face_id)}.jpg"
+
+
+def video_thumb_path(video_id: int) -> Path:
+    return VIDEO_THUMBS_DIR / f"{int(video_id)}.jpg"
 
 
 def thumb_image(img: Image.Image) -> Image.Image:

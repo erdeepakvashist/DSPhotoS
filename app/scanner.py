@@ -20,12 +20,13 @@ from .db import get_conn
 from .faces import get_engine
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
 WORKERS = max(2, min(6, (os.cpu_count() or 4) - 2))
 
 # Progress shared with /api/scan/status. 'state': idle | scanning | stopping | error
 # 'phase' says what the scan is doing even before per-photo progress exists.
 STATUS = {"state": "idle", "phase": "", "total": 0, "done": 0, "current": "",
-          "new_photos": 0, "error": ""}
+          "new_photos": 0, "new_videos": 0, "error": ""}
 _scan_lock = threading.Lock()
 _stop = threading.Event()
 
@@ -36,7 +37,7 @@ def start_scan() -> bool:
         return False
     _stop.clear()
     STATUS.update(state="scanning", phase="starting…", total=0, done=0, current="",
-                  new_photos=0, error="")
+                  new_photos=0, new_videos=0, error="")
     threading.Thread(target=_run_scan, daemon=True).start()
     return True
 
@@ -120,32 +121,33 @@ def _backfill_sharpness():
     conn.commit()
 
 
-def _scan():
-    conn = get_conn()  # scanner thread's own connection
-    folders = [r["path"] for r in conn.execute("SELECT path FROM folders")]
+def _custom_archive_path(conn) -> str | None:
+    p = archive.get_archive_folder(conn)
+    return os.path.normcase(os.path.normpath(p)) if p else None
 
-    # Collect candidate files, skipping already-indexed unchanged ones.
-    STATUS["phase"] = "finding photos…"
-    known = {r["path"]: r["mtime"] for r in conn.execute("SELECT path, mtime FROM photos")}
-    _custom_archive = archive.get_archive_folder(conn)
-    custom_archive = os.path.normcase(os.path.normpath(_custom_archive)) if _custom_archive else None
+
+def _find_changed_files(conn, folders, custom_archive, exts, table: str):
+    """Walk `folders` for files with one of `exts`, skipping the Archive
+    folder(s), and split into (todo, gone) against what's already in `table`:
+    todo = new-or-modified files to (re)index, gone = previously-indexed
+    paths that vanished from a still-reachable folder (and are removed from
+    the table here)."""
+    known = {r["path"]: r["mtime"] for r in conn.execute(f"SELECT path, mtime FROM {table}")}
     todo, seen = [], set()
     for root in folders:
         for dirpath, dirnames, filenames in os.walk(root):
             # "Archive" (or the user's configured archive folder, wherever it
-            # is) holds photos moved out of the library via duplicate cleanup
-            # — never re-index them.
+            # is) holds photos/videos moved out of the library via duplicate
+            # cleanup — never re-index them.
             dirnames[:] = [d for d in dirnames if d.lower() != "archive"
                           and (custom_archive is None
                                or os.path.normcase(os.path.normpath(os.path.join(dirpath, d)))
                                != custom_archive)]
             for fn in filenames:
-                if os.path.splitext(fn)[1].lower() not in IMAGE_EXTS:
+                if os.path.splitext(fn)[1].lower() not in exts:
                     continue
                 p = os.path.join(dirpath, fn)
                 seen.add(p)
-                if len(seen) % 500 == 0:
-                    STATUS["current"] = f"{len(seen)} files found, {len(todo)} new"
                 try:
                     mtime = os.path.getmtime(p)
                 except OSError:
@@ -162,49 +164,78 @@ def _scan():
         return any(n.startswith(r.rstrip("\\/") + os.sep) for r in reachable)
     gone = [p for p in known if p not in seen and _under_reachable(p)]
     for p in gone:
-        conn.execute("DELETE FROM photos WHERE path=?", (p,))
+        conn.execute(f"DELETE FROM {table} WHERE path=?", (p,))
     if gone:
         conn.commit()
+    return todo, gone
 
-    STATUS["total"] = len(todo)
+
+def _scan():
+    conn = get_conn()  # scanner thread's own connection
+    folders = [r["path"] for r in conn.execute("SELECT path FROM folders")]
+    custom_archive = _custom_archive_path(conn)
+
+    STATUS["phase"] = "finding photos…"
+    photo_todo, photo_gone = _find_changed_files(conn, folders, custom_archive, IMAGE_EXTS, "photos")
+    STATUS["phase"] = "finding videos…"
+    video_todo, video_gone = _find_changed_files(conn, folders, custom_archive, VIDEO_EXTS, "videos")
+
+    STATUS["total"] = len(photo_todo) + len(video_todo)
     STATUS["current"] = ""
-    if todo:
+    if photo_todo:
         STATUS["phase"] = "loading AI models (first run downloads them, ~650 MB)…"
         get_engine()  # load models once before workers start
         clip_search.embed_text("warmup")
-    persons = matching.person_centroids(conn) if todo else {}
-    clusters = matching.cluster_centroids(conn) if todo else {}
-    STATUS["phase"] = "indexing photos" if todo else ""
+    persons = matching.person_centroids(conn) if photo_todo else {}
+    clusters = matching.cluster_centroids(conn) if photo_todo else {}
 
-    # Sliding window of in-flight futures keeps memory bounded while all
-    # WORKERS stay busy; results are stored in submission order.
-    with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
-        window = deque()
-        todo_iter = iter(todo)
-        while True:
-            if _stop.is_set():
-                for fut, _ in window:
-                    fut.cancel()  # queued tasks; already-running ones just finish
-                break
-            while len(window) < WORKERS * 2:
-                nxt = next(todo_iter, None)
-                if nxt is None:
+    if photo_todo:
+        STATUS["phase"] = "indexing photos"
+        # Sliding window of in-flight futures keeps memory bounded while all
+        # WORKERS stay busy; results are stored in submission order.
+        with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
+            window = deque()
+            todo_iter = iter(photo_todo)
+            while True:
+                if _stop.is_set():
+                    for fut, _ in window:
+                        fut.cancel()  # queued tasks; already-running ones just finish
                     break
-                window.append((pool.submit(_process_photo, *nxt), nxt))
-            if not window:
-                break
-            fut, (path, mtime) = window.popleft()
-            STATUS["current"] = os.path.basename(path)
-            try:
-                _store_photo(conn, fut.result(), persons, clusters)
-                STATUS["new_photos"] += 1
-            except Exception:
-                traceback.print_exc()  # skip unreadable/corrupt file, keep scanning
-            STATUS["done"] += 1
+                while len(window) < WORKERS * 2:
+                    nxt = next(todo_iter, None)
+                    if nxt is None:
+                        break
+                    window.append((pool.submit(_process_photo, *nxt), nxt))
+                if not window:
+                    break
+                fut, (path, mtime) = window.popleft()
+                STATUS["current"] = os.path.basename(path)
+                try:
+                    _store_photo(conn, fut.result(), persons, clusters)
+                    STATUS["new_photos"] += 1
+                except Exception:
+                    traceback.print_exc()  # skip unreadable/corrupt file, keep scanning
+                STATUS["done"] += 1
+
+    if video_todo and not _stop.is_set():
+        STATUS["phase"] = "indexing videos"
+        with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
+            for (path, mtime), meta in zip(video_todo, pool.map(_video_metadata,
+                                                                 (p for p, _ in video_todo))):
+                if _stop.is_set():
+                    break
+                STATUS["current"] = os.path.basename(path)
+                if meta is not None:
+                    try:
+                        _store_video(conn, path, mtime, meta)
+                        STATUS["new_videos"] += 1
+                    except Exception:
+                        traceback.print_exc()
+                STATUS["done"] += 1
 
     matching._drop_empty_clusters(conn)
     conn.commit()
-    if STATUS["new_photos"] or gone:
+    if STATUS["new_photos"] or photo_gone:
         STATUS.update(phase="building smart albums…", current="")
         try:
             smart_albums.regenerate(conn)
@@ -268,6 +299,41 @@ def _store_photo(conn, r: dict, persons, clusters):
 
     conn.execute("INSERT OR REPLACE INTO clip_embeddings(photo_id, embedding) VALUES (?,?)",
                  (photo_id, r["clip"].tobytes()))
+    conn.commit()
+
+
+def _video_metadata(path: str) -> dict | None:
+    """Worker thread: probe a video for dimensions/duration and grab a
+    representative frame for the thumbnail. No face/CLIP processing — videos
+    aren't face- or text-searched (yet), just browsed in their own tab."""
+    cap = cv2.VideoCapture(path)
+    if not cap.isOpened():
+        cap.release()
+        return None
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or None
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or None
+    fps = cap.get(cv2.CAP_PROP_FPS) or 0
+    frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+    duration = (frame_count / fps) if fps > 0 else None
+    # a frame ~1s in is a more representative thumbnail than frame 0 (often
+    # black, or a lens cap) when the video is long enough to have one
+    if fps and frame_count > fps:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, fps)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok:
+        return None
+    thumb = thumbnails.thumb_image(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+    return {"width": width, "height": height, "duration": duration, "thumb": thumb}
+
+
+def _store_video(conn, path: str, mtime: float, meta: dict):
+    conn.execute("DELETE FROM videos WHERE path=?", (path,))  # re-index changed file
+    taken_at = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+    video_id = conn.execute(
+        "INSERT INTO videos(path, mtime, width, height, duration, taken_at) VALUES (?,?,?,?,?,?)",
+        (path, mtime, meta["width"], meta["height"], meta["duration"], taken_at)).lastrowid
+    meta["thumb"].save(thumbnails.video_thumb_path(video_id), "JPEG", quality=82)
     conn.commit()
 
 

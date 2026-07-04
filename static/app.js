@@ -60,6 +60,7 @@ function route() {
   clearSelection();
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
+  else if (name === "videos") { $("#view-videos").classList.remove("hidden"); loadVideos(); }
   else if (name === "unknown") { $("#view-unknown").classList.remove("hidden"); loadClusters(); }
   else if (name === "duplicates") { $("#view-duplicates").classList.remove("hidden"); loadDuplicates(); }
   else if (name === "albums") { $("#view-albums").classList.remove("hidden"); loadAlbums(); }
@@ -165,6 +166,15 @@ function bindChrome() {
   $("#browse-archive-btn").onclick = browseArchiveFolder;
   $("#save-archive-btn").onclick = saveArchiveFolder;
   $("#reset-archive-btn").onclick = resetArchiveFolder;
+  $("#video-player-close").onclick = closeVideoPlayer;
+  $("#scan-videos-btn").onclick = async () => {
+    $("#video-scan-note").textContent = "Scanning…";
+    try { await api.send("POST", "/api/scan"); } catch (e) { $("#video-scan-note").textContent = "A scan is already running…"; }
+    pollStatus();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (!$("#video-player").classList.contains("hidden") && e.key === "Escape") closeVideoPlayer();
+  });
   $("#scan-btn").onclick = async () => {
     try { await api.send("POST", "/api/scan"); } catch (e) { /* already running */ }
     pollStatus();
@@ -662,6 +672,75 @@ async function loadDuplicates() {
   }
 }
 
+/* ---------------- videos ---------------- */
+const videoState = { items: [], cursor: null, loading: false, done: false };
+
+async function loadVideos() {
+  videoState.items = []; videoState.cursor = null; videoState.done = false;
+  $("#video-grid").innerHTML = "";
+  $("#video-grid-empty").classList.add("hidden");
+  if (lastScanState !== "scanning" && lastScanState !== "stopping") $("#video-scan-note").textContent = "";
+  await loadMoreVideos();
+  observeVideoSentinel();
+}
+
+async function loadMoreVideos() {
+  if (videoState.loading || videoState.done) return;
+  videoState.loading = true;
+  const qs = new URLSearchParams();
+  if (videoState.cursor) qs.set("cursor", videoState.cursor);
+  const data = await api.get("/api/videos?" + qs);
+  videoState.cursor = data.next_cursor;
+  videoState.done = !data.next_cursor;
+  const grid = $("#video-grid");
+  for (const v of data.items) {
+    videoState.items.push(v);
+    grid.appendChild(videoTile(v));
+  }
+  videoState.loading = false;
+  if (!videoState.items.length) {
+    $("#video-grid-empty").classList.remove("hidden");
+    $("#video-grid-empty").textContent =
+      "No videos yet — add a folder with videos in Settings and run a scan.";
+  }
+}
+
+function videoTile(v) {
+  const d = el("div", "video-tile");
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.src = "/media/video-thumb/" + v.id;
+  d.append(img, el("span", "video-play", "▶"), el("span", "video-duration", formatDuration(v.duration)));
+  d.onclick = () => openVideoPlayer(v.id);
+  return d;
+}
+
+function formatDuration(sec) {
+  if (sec == null) return "";
+  sec = Math.round(sec);
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function openVideoPlayer(id) {
+  $("#video-player-el").src = "/media/video/" + id;
+  $("#video-player").classList.remove("hidden");
+}
+
+function closeVideoPlayer() {
+  const v = $("#video-player-el");
+  v.pause(); v.src = "";
+  $("#video-player").classList.add("hidden");
+}
+
+let videoSentinelObs = null;
+function observeVideoSentinel() {
+  if (videoSentinelObs) videoSentinelObs.disconnect();
+  videoSentinelObs = new IntersectionObserver((es) => es[0].isIntersecting && loadMoreVideos(),
+    { rootMargin: "800px" });
+  videoSentinelObs.observe($("#video-grid-sentinel"));
+}
+
 function updateUnknownBadge(n) {
   const b = $("#unknown-badge");
   b.classList.toggle("hidden", !n);
@@ -835,6 +914,7 @@ async function addFolder() {
 async function pollStatus() {
   let s;
   try { s = await api.get("/api/scan/status"); } catch { return; }
+  const wasRunning = lastScanState === "scanning" || lastScanState === "stopping";
   lastScanState = s.state;
   updateUnknownBadge(s.stats.clusters);
   const running = s.state === "scanning" || s.state === "stopping";
@@ -845,6 +925,11 @@ async function pollStatus() {
   if (running) {
     $("#scan-chip-text").textContent = s.state === "stopping" ? "Stopping…" :
       s.total ? `Scanning ${s.done}/${s.total}` : (s.phase || "Scanning…");
+  }
+
+  if (wasRunning && !running && state.route === "videos") {
+    $("#video-scan-note").textContent = s.new_videos ? `Found ${s.new_videos} new video(s).` : "No new videos found.";
+    loadVideos();
   }
 
   if (state.route !== "settings") return;
@@ -860,11 +945,14 @@ async function pollStatus() {
   } else {
     prog.classList.add("hidden");
     $("#scan-btn").disabled = false;
+    const added = [s.new_photos && `${s.new_photos} photo(s)`, s.new_videos && `${s.new_videos} video(s)`]
+      .filter(Boolean).join(" and ");
     st.textContent = s.state === "error" ? "Scan error: " + s.error :
-      (s.new_photos ? `Last scan added ${s.new_photos} photos.` : "");
+      (added ? `Last scan added ${added}.` : "");
   }
   $("#index-stats").innerHTML =
-    `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.faces}</b>faces</div>` +
+    `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.videos}</b>videos</div>` +
+    `<div><b>${s.stats.faces}</b>faces</div>` +
     `<div><b>${s.stats.persons}</b>people</div><div><b>${s.stats.clusters}</b>unknown groups</div>`;
   $("#backfill-row").classList.toggle("hidden", !s.stats.unscored || running);
   $("#backfill-note").textContent = s.stats.unscored

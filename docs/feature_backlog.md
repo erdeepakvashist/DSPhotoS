@@ -85,8 +85,9 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 |---|---|---|
 | Sharpness backfill for pre-existing photos | ✅ | 60384e4 |
 | Configurable Archive folder (Settings) | ✅ | c850d65 |
-| Lightbox zoom (mouse wheel + drag-to-pan) | ✅ | (pending) |
-| Location-aware search ("marriage in Ambala") | ✅ | (pending) |
+| Lightbox zoom (mouse wheel + drag-to-pan) | ✅ | 2ab348e |
+| Location-aware search ("marriage in Ambala") | ✅ | 2ab348e |
+| Videos tab (separate from Photos) | ✅ | (pending) |
 
 - **Lightbox zoom** — mouse wheel zooms in/out (1x–6x) anchored to the cursor
   position via `translate()+scale()` math on `#lb-stage`; drag-to-pan once
@@ -100,3 +101,15 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
   phrase actually matches a geocoded place in the library, so ordinary
   queries containing " in " (e.g. "kids playing in the rain") aren't
   misparsed. Falls back to a plain CLIP search otherwise.
+- **Videos tab** — new `videos` table (path, dimensions, duration, taken_at
+  from file mtime — no face/CLIP processing, no EXIF-based capture date yet)
+  populated by the scanner alongside photos in the same scan pass, sharing
+  its Archive-folder skip logic (`scanner._find_changed_files`, factored out
+  of the old photo-only walk). New `app/api/videos.py` serves a paginated
+  list, thumbnails (first-second video frame), and the video file itself —
+  Starlette's `FileResponse` handles Range requests natively, so seeking
+  works without extra code. A new 🎬 Videos tab shows a thumbnail grid with
+  duration badges; clicking opens a fullscreen native `<video controls>`
+  player. A "🔄 Scan for videos" button on the tab itself (not just Settings)
+  triggers the same unified scan and auto-refreshes the grid when it
+  finishes.

@@ -182,6 +182,30 @@ main { flex: 1; overflow-y: auto; padding: 20px 22px 40px; }
 .ph.selected { box-shadow: inset 0 0 0 2px var(--accent2); }
 #grid-sentinel { height: 1px; }
 
+/* ---- videos ---- */
+.video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.video-tile {
+  position: relative; aspect-ratio: 16/9; border-radius: var(--radius);
+  overflow: hidden; cursor: pointer; background: var(--bg3);
+}
+.video-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.video-play {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 30px; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6);
+  background: rgba(0,0,0,.15); transition: background .15s;
+}
+.video-tile:hover .video-play { background: rgba(0,0,0,.32); }
+.video-duration {
+  position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.75); color: #fff;
+  font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 5px;
+}
+.video-player {
+  position: fixed; inset: 0; background: rgba(7,9,12,.97); z-index: 5500;
+  display: flex; align-items: center; justify-content: center;
+}
+.video-player video { max-width: 92vw; max-height: 92vh; }
+.video-player-close { position: absolute; top: 20px; right: 20px; }
+
 /* ---- cards (people / albums) ---- */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; }
 .card {

@@ -10,6 +10,7 @@ DATA_DIR = Path(os.environ.get("DPS_DATA_DIR",
 DB_PATH = DATA_DIR / "photos.db"
 THUMBS_DIR = DATA_DIR / "thumbs"
 FACES_DIR = DATA_DIR / "thumbs" / "faces"
+VIDEO_THUMBS_DIR = DATA_DIR / "thumbs" / "videos"
 MODELS_DIR = DATA_DIR / "models"
 
 _local = threading.local()
@@ -89,6 +90,16 @@ CREATE TABLE IF NOT EXISTS app_settings (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+CREATE TABLE IF NOT EXISTS videos (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL UNIQUE,
+    mtime REAL NOT NULL,
+    width INTEGER, height INTEGER,
+    duration REAL,              -- seconds
+    taken_at TEXT,               -- ISO 'YYYY-MM-DD HH:MM:SS' (from file mtime)
+    scanned_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_videos_taken ON videos(taken_at DESC, id DESC);
 """
 
 
@@ -109,6 +120,7 @@ def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     THUMBS_DIR.mkdir(parents=True, exist_ok=True)
     FACES_DIR.mkdir(parents=True, exist_ok=True)
+    VIDEO_THUMBS_DIR.mkdir(parents=True, exist_ok=True)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     conn = get_conn()
     conn.executescript(SCHEMA)

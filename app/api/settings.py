@@ -168,5 +168,6 @@ def scan_status():
             "WHERE cluster_id IS NOT NULL AND person_id IS NULL AND ignored=0").fetchone()["c"],
         "unscored": conn.execute(
             "SELECT COUNT(*) c FROM photos WHERE sharpness IS NULL").fetchone()["c"],
+        "videos": conn.execute("SELECT COUNT(*) c FROM videos").fetchone()["c"],
     }
     return {**scanner.STATUS, "stats": stats}
