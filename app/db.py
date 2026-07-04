@@ -85,6 +85,10 @@ CREATE TABLE IF NOT EXISTS search_history (
     searched_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 
@@ -117,4 +121,15 @@ def init_db():
         conn.execute("ALTER TABLE photos ADD COLUMN sharpness REAL")
     except sqlite3.OperationalError:
         pass  # column already present
+    conn.commit()
+
+
+def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    row = conn.execute("SELECT value FROM app_settings WHERE key=?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute("INSERT INTO app_settings(key, value) VALUES (?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
     conn.commit()

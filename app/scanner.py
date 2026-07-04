@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps, ExifTags
 
-from . import clip_search, matching, smart_albums, thumbnails
+from . import archive, clip_search, matching, smart_albums, thumbnails
 from .db import get_conn
 from .faces import get_engine
 
@@ -127,12 +127,18 @@ def _scan():
     # Collect candidate files, skipping already-indexed unchanged ones.
     STATUS["phase"] = "finding photos…"
     known = {r["path"]: r["mtime"] for r in conn.execute("SELECT path, mtime FROM photos")}
+    _custom_archive = archive.get_archive_folder(conn)
+    custom_archive = os.path.normcase(os.path.normpath(_custom_archive)) if _custom_archive else None
     todo, seen = [], set()
     for root in folders:
         for dirpath, dirnames, filenames in os.walk(root):
-            # "Archive" holds photos the user moved out of the library (e.g. via
-            # duplicate cleanup) — never re-index them.
-            dirnames[:] = [d for d in dirnames if d.lower() != "archive"]
+            # "Archive" (or the user's configured archive folder, wherever it
+            # is) holds photos moved out of the library via duplicate cleanup
+            # — never re-index them.
+            dirnames[:] = [d for d in dirnames if d.lower() != "archive"
+                          and (custom_archive is None
+                               or os.path.normcase(os.path.normpath(os.path.join(dirpath, d)))
+                               != custom_archive)]
             for fn in filenames:
                 if os.path.splitext(fn)[1].lower() not in IMAGE_EXTS:
                     continue

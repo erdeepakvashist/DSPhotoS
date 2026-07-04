@@ -31,7 +31,11 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    new `/api/duplicates` endpoint + UI panel to review. "Archive the others"
    moves non-kept copies into an `Archive` folder beside the originals
    (`app/archive.py`) — files are moved, never deleted, and the scanner skips
-   `Archive` folders so they don't come back.
+   `Archive` folders so they don't come back. Settings > Archive folder lets
+   the user instead pick one fixed destination for all archived photos
+   (`app_settings` key-value table, `GET/POST/DELETE /api/settings/archive-folder`);
+   the scanner skips that exact path too, wherever it lives, not just
+   folders literally named "Archive".
 4. **Location hotspots** — `app/hotspots.py` reverse-geocodes GPS EXIF into named
    places (reusing the same offline geocoder as smart_albums.py) and ranks them
    by photo count; the map view gets a "Top places" side panel plus

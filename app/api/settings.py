@@ -8,8 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from .. import export, scanner
-from ..db import get_conn
+from .. import archive, export, scanner
+from ..db import get_conn, set_setting
 
 router = APIRouter(prefix="/api")
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -83,7 +83,7 @@ _picker_lock = threading.Lock()
 
 
 @router.get("/pick-folder")
-def pick_folder():
+def pick_folder(title: str = "Choose a photo folder"):
     """Open the native Windows folder dialog on this machine (the server and the
     browser are the same PC) and return the chosen path."""
     if not _picker_lock.acquire(blocking=False):
@@ -94,11 +94,36 @@ def pick_folder():
         root = tkinter.Tk()
         root.withdraw()
         root.wm_attributes("-topmost", 1)
-        path = filedialog.askdirectory(parent=root, title="Choose a photo folder")
+        path = filedialog.askdirectory(parent=root, title=title)
         root.destroy()
         return {"path": os.path.normpath(path) if path else None}
     finally:
         _picker_lock.release()
+
+
+@router.get("/settings/archive-folder")
+def get_archive_folder():
+    return {"path": archive.get_archive_folder(get_conn())}
+
+
+@router.post("/settings/archive-folder")
+def set_archive_folder(body: FolderIn):
+    raw = body.path.strip().strip('"')
+    if not os.path.isabs(raw) or ".." in Path(raw).parts:
+        raise HTTPException(400, "Path must be an absolute folder path")
+    path = os.path.realpath(raw)
+    os.makedirs(path, exist_ok=True)
+    set_setting(get_conn(), archive.ARCHIVE_FOLDER_SETTING, path)
+    return {"ok": True, "path": path}
+
+
+@router.delete("/settings/archive-folder")
+def reset_archive_folder():
+    """Back to the default: an 'Archive' folder beside each original."""
+    conn = get_conn()
+    conn.execute("DELETE FROM app_settings WHERE key=?", (archive.ARCHIVE_FOLDER_SETTING,))
+    conn.commit()
+    return {"ok": True}
 
 
 @router.post("/scan")

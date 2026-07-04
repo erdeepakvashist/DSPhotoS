@@ -162,6 +162,9 @@ function bindChrome() {
   $("#add-folder-btn").onclick = addFolder;
   $("#browse-folder-btn").onclick = browseFolder;
   $("#folder-input").addEventListener("keydown", (e) => e.key === "Enter" && addFolder());
+  $("#browse-archive-btn").onclick = browseArchiveFolder;
+  $("#save-archive-btn").onclick = saveArchiveFolder;
+  $("#reset-archive-btn").onclick = resetArchiveFolder;
   $("#scan-btn").onclick = async () => {
     try { await api.send("POST", "/api/scan"); } catch (e) { /* already running */ }
     pollStatus();
@@ -770,6 +773,32 @@ async function loadSettings() {
     li.append(el("span", "", f.path), rm);
     ul.appendChild(li);
   }
+  const arch = await api.get("/api/settings/archive-folder");
+  $("#archive-folder-input").value = arch.path || "";
+}
+
+async function browseArchiveFolder() {
+  const btn = $("#browse-archive-btn");
+  btn.disabled = true;
+  btn.textContent = "Choose the folder in the Windows dialog…";
+  try {
+    const r = await api.get("/api/pick-folder?title=" + encodeURIComponent("Choose an archive folder"));
+    if (r.path) $("#archive-folder-input").value = r.path;
+  } catch (e) { alert(e.message || "Could not open the folder dialog."); }
+  btn.disabled = false;
+  btn.textContent = "Browse…";
+}
+
+async function saveArchiveFolder() {
+  const path = $("#archive-folder-input").value.trim();
+  if (!path) return;
+  try { await api.send("POST", "/api/settings/archive-folder", { path }); loadSettings(); }
+  catch (e) { alert(e.message); }
+}
+
+async function resetArchiveFolder() {
+  await api.send("DELETE", "/api/settings/archive-folder");
+  loadSettings();
 }
 
 async function browseFolder() {
