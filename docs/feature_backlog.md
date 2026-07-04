@@ -18,7 +18,7 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
 | 8 | Metadata export (EXIF/XMP keywords, CSV) | ⬜ | |
 | 9 | Story sequences — auto day/trip recap albums | ⬜ | |
 | 10 | Personalized search suggestions | ⬜ | |
-| 11 | Mobile LAN photo upload | ⬜ | |
+| 11 | Mobile LAN photo upload | ⏸️ deferred | |
 | 12 | Smart face-level dedup (blurry duplicate face flagging) | ✅ merged into 3+6 | 687025a |
 
 ## Notes per feature
@@ -60,8 +60,13 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
     query (`POST /api/search/log`); `GET /api/search/suggestions` ranks past
     queries by frequency then recency. A dropdown under the search box shows
     them on focus (when the box is empty).
-11. **Mobile LAN upload** — `/upload` page + endpoint reachable from phone
-    browsers on the same LAN, saved into a watched folder.
+11. **Mobile LAN upload** — deferred. The app is deliberately bound to
+    127.0.0.1 only with zero authentication (see SECURITY.md / README:
+    "everything stays on your machine"); making it phone-reachable means
+    binding to 0.0.0.0, which would expose every photo, face tag, and the
+    scan/quit controls to anyone on the LAN. Needs a real auth story (PIN
+    gate, at minimum) before it's safe to build — deferred rather than
+    shipped without one.
 12. **Face-level dedup** — within near-duplicate photo groups, prefer the photo
     whose faces have the highest `det_score` (sharpest) when suggesting which
     to keep.
