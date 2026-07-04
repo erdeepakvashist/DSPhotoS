@@ -300,8 +300,21 @@ input[type=text], input[type=search] { font: inherit; }
 }
 
 /* ---- map ---- */
-#map { height: calc(100vh - 150px); border-radius: var(--radius); border: 1px solid var(--line); }
+.map-layout { display: flex; gap: 14px; height: calc(100vh - 150px); }
+#map { flex: 1; border-radius: var(--radius); border: 1px solid var(--line); }
 .leaflet-container { background: var(--bg3); }
+.map-places {
+  width: 240px; flex-shrink: 0; overflow-y: auto; background: var(--bg2);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 10px;
+}
+.map-places h3 { font-size: 13px; color: var(--fg2); text-transform: uppercase;
+  letter-spacing: .08em; margin: 4px 6px 10px; }
+.place-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 8px 6px; border-radius: 8px; cursor: pointer;
+}
+.place-row:hover { background: var(--bg3); }
+.place-row .count { color: var(--fg2); font-size: 12px; }
 
 /* ---- selection bar ---- */
 .selbar {

@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from .. import archive, dedup
+from .. import archive, dedup, hotspots
 from ..db import get_conn
 from ..thumbnails import face_path, thumb_path
 
@@ -79,6 +79,12 @@ def map_markers():
     return [dict(r) for r in conn.execute(
         "SELECT id, gps_lat lat, gps_lon lon, taken_at FROM photos "
         "WHERE gps_lat IS NOT NULL AND gps_lon IS NOT NULL")]
+
+
+@router.get("/api/map/hotspots")
+def map_hotspots():
+    """Named places ranked by photo count, for the 'Top places' panel on the map."""
+    return hotspots.top_places(get_conn())
 
 
 @router.get("/media/photo/{photo_id}")

@@ -600,6 +600,29 @@ async function loadMap() {
     });
   });
   state.map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+  loadHotspots();
+}
+
+async function loadHotspots() {
+  const places = await api.get("/api/map/hotspots");
+  if (!state.hotspotLayer) state.hotspotLayer = L.layerGroup().addTo(state.map);
+  state.hotspotLayer.clearLayers();
+  const panel = $("#map-places");
+  panel.innerHTML = "";
+  if (!places.length) return;
+  panel.appendChild(el("h3", "", "📍 Top places"));
+  const maxCount = Math.max(...places.map((p) => p.count));
+  for (const p of places) {
+    // radius scales with sqrt(count) so area (not radius) tracks photo density
+    const radius = 400 + 2200 * Math.sqrt(p.count / maxCount);
+    L.circle([p.lat, p.lon], {
+      radius, color: "#4b90f5", weight: 1, fillColor: "#8ab4f8", fillOpacity: 0.15,
+    }).addTo(state.hotspotLayer);
+    const row = el("div", "place-row");
+    row.append(el("span", "", p.name), el("span", "count", `${p.count}`));
+    row.onclick = () => state.map.setView([p.lat, p.lon], 11);
+    panel.appendChild(row);
+  }
 }
 
 /* ---------------- settings ---------------- */

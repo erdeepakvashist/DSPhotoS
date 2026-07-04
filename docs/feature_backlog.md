@@ -32,8 +32,10 @@ Legend: ⬜ Not started · 🔄 In progress · ✅ Done · ⏸️ Deferred
    moves non-kept copies into an `Archive` folder beside the originals
    (`app/archive.py`) — files are moved, never deleted, and the scanner skips
    `Archive` folders so they don't come back.
-4. **Location hotspots** — cluster GPS points (grid/geohash) server-side, surface
-   as marker clusters/heat circles on the existing Leaflet map.
+4. **Location hotspots** — `app/hotspots.py` reverse-geocodes GPS EXIF into named
+   places (reusing the same offline geocoder as smart_albums.py) and ranks them
+   by photo count; the map view gets a "Top places" side panel plus
+   density circles sized by `sqrt(count)`.
 5. **Search by face** — lightbox face boxes become clickable, reusing
    `matching`/embedding search already backing `/api/search/face`.
 6. **Quality scoring** — Laplacian-variance blur + histogram exposure computed
