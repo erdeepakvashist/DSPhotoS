@@ -5,10 +5,10 @@ import sys
 import threading
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from .. import scanner
+from .. import export, scanner
 from ..db import get_conn
 
 router = APIRouter(prefix="/api")
@@ -108,11 +108,27 @@ def start_scan():
     return {"ok": True}
 
 
+@router.post("/scan/backfill-sharpness")
+def backfill_sharpness():
+    """Score already-indexed photos for quality without a full re-scan — for
+    photos indexed before quality scoring existed."""
+    if not scanner.start_backfill_sharpness():
+        raise HTTPException(409, "A scan is already running")
+    return {"ok": True}
+
+
 @router.post("/scan/stop")
 def stop_scan():
     if not scanner.stop_scan():
         raise HTTPException(409, "No scan running")
     return {"ok": True}
+
+
+@router.get("/export/csv")
+def export_csv():
+    csv_text = export.export_csv(get_conn())
+    return Response(content=csv_text, media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="dsphotos_metadata.csv"'})
 
 
 @router.get("/scan/status")
@@ -125,5 +141,7 @@ def scan_status():
         "clusters": conn.execute(
             "SELECT COUNT(DISTINCT cluster_id) c FROM faces "
             "WHERE cluster_id IS NOT NULL AND person_id IS NULL AND ignored=0").fetchone()["c"],
+        "unscored": conn.execute(
+            "SELECT COUNT(*) c FROM photos WHERE sharpness IS NULL").fetchone()["c"],
     }
     return {**scanner.STATUS, "stats": stats}

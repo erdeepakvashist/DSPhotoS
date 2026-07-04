@@ -63,6 +63,13 @@ body {
   box-shadow: 0 0 0 3px rgba(75,144,245,.15);
 }
 .searchbox input { padding-right: 46px; }
+.search-suggestions {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; z-index: 60; box-shadow: var(--shadow);
+}
+.suggestion-row { padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.suggestion-row:hover { background: var(--bg4); }
 .cam-btn {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
   width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
@@ -114,6 +121,20 @@ main { flex: 1; overflow-y: auto; padding: 20px 22px 40px; }
   animation: spin .9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- memories strip ---- */
+.memories-strip { margin: 6px 2px 22px; display: flex; flex-direction: column; gap: 14px; }
+.memory-card {
+  background: var(--panel, rgba(139,180,248,.06)); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 14px;
+}
+.memory-title { font-size: 14px; font-weight: 600; color: var(--fg2); margin-bottom: 10px; }
+.memory-photos { display: flex; gap: 8px; overflow-x: auto; }
+.memory-photos img {
+  height: 100px; width: 100px; object-fit: cover; border-radius: 8px; cursor: pointer;
+  flex-shrink: 0; transition: transform .15s ease;
+}
+.memory-photos img:hover { transform: scale(1.04); }
 
 /* ---- photo grid ---- */
 .grid-header {
@@ -205,6 +226,17 @@ main { flex: 1; overflow-y: auto; padding: 20px 22px 40px; }
 .cluster .meta .title { font-weight: 600; font-size: 15px; }
 .cluster .tagbox { display: flex; gap: 8px; }
 
+/* ---- duplicates ---- */
+.dup-thumb { position: relative; }
+.dup-thumb img {
+  width: 110px; height: 110px; object-fit: cover; border-radius: 8px;
+  background: var(--bg3); cursor: pointer;
+}
+.dup-keep {
+  position: absolute; top: 4px; left: 4px; background: rgba(20,26,38,.85);
+  color: #ffd166; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+}
+
 /* ---- forms/buttons ---- */
 .btn {
   background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
@@ -275,8 +307,21 @@ input[type=text], input[type=search] { font: inherit; }
 }
 
 /* ---- map ---- */
-#map { height: calc(100vh - 150px); border-radius: var(--radius); border: 1px solid var(--line); }
+.map-layout { display: flex; gap: 14px; height: calc(100vh - 150px); }
+#map { flex: 1; border-radius: var(--radius); border: 1px solid var(--line); }
 .leaflet-container { background: var(--bg3); }
+.map-places {
+  width: 240px; flex-shrink: 0; overflow-y: auto; background: var(--bg2);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 10px;
+}
+.map-places h3 { font-size: 13px; color: var(--fg2); text-transform: uppercase;
+  letter-spacing: .08em; margin: 4px 6px 10px; }
+.place-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 8px 6px; border-radius: 8px; cursor: pointer;
+}
+.place-row:hover { background: var(--bg3); }
+.place-row .count { color: var(--fg2); font-size: 12px; }
 
 /* ---- selection bar ---- */
 .selbar {
@@ -288,6 +333,26 @@ input[type=text], input[type=search] { font: inherit; }
   box-shadow: var(--shadow);
 }
 #selbar-count { font-weight: 600; margin-right: 4px; }
+
+/* ---- story / slideshow ---- */
+.story-view {
+  position: fixed; inset: 0; background: #000; z-index: 6000;
+  display: flex; align-items: center; justify-content: center;
+}
+.story-view img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+}
+.story-progress {
+  position: absolute; top: 10px; left: 12px; right: 12px; display: flex; gap: 4px; z-index: 2;
+}
+.story-seg { flex: 1; height: 3px; background: rgba(255,255,255,.25); border-radius: 2px; }
+.story-seg.done { background: rgba(255,255,255,.7); }
+.story-seg.active { background: rgba(255,255,255,.95); }
+.story-close { position: absolute; top: 20px; right: 16px; z-index: 3; }
+.story-nav {
+  position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 14px; z-index: 3;
+}
 
 /* ---- lightbox ---- */
 .lightbox {

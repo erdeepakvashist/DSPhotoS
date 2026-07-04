@@ -1,13 +1,62 @@
 """Photo detail, favorite toggle, map markers, and media serving."""
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
+from .. import archive, dedup, hotspots, privacy
 from ..db import get_conn
 from ..thumbnails import face_path, thumb_path
 
 router = APIRouter()
+
+
+class PhotoIdsIn(BaseModel):
+    photo_ids: list[int]
+
+
+@router.get("/api/duplicates")
+def duplicates():
+    """Groups of near-identical photos (by CLIP similarity), sharpest first."""
+    conn = get_conn()
+    groups = dedup.find_duplicate_groups(conn)
+    out = []
+    for group in groups:
+        qmarks = ",".join("?" * len(group))
+        rows = {r["id"]: dict(r) for r in conn.execute(
+            f"SELECT id, taken_at, width, height, favorite, sharpness FROM photos "
+            f"WHERE id IN ({qmarks})", group)}
+        photos = [rows[i] for i in group if i in rows]
+        # prefer the sharpest copy; fall back to resolution when sharpness is
+        # unavailable (e.g. photos indexed before this scoring was added)
+        photos.sort(key=lambda p: (p["sharpness"] if p["sharpness"] is not None else -1,
+                                    (p["width"] or 0) * (p["height"] or 0)), reverse=True)
+        if len(photos) > 1:
+            out.append(photos)
+    out.sort(key=len, reverse=True)
+    return out
+
+
+@router.get("/api/best-shots")
+def best_shots(limit: int = 200):
+    """Sharpest-scoring photos in the library — a quick quality-based cut."""
+    conn = get_conn()
+    return [dict(r) for r in conn.execute(
+        "SELECT id, taken_at, width, height, favorite, sharpness FROM photos "
+        "WHERE sharpness IS NOT NULL ORDER BY sharpness DESC LIMIT ?", (limit,))]
+
+
+@router.post("/api/duplicates/archive")
+def archive_duplicates(body: PhotoIdsIn):
+    """Move the given photos' files into an 'Archive' folder beside their
+    originals for the user to review/delete themselves; never deletes files."""
+    conn = get_conn()
+    archived, failed = [], []
+    for pid in body.photo_ids:
+        dest = archive.archive_photo(conn, pid)
+        (archived if dest else failed).append(pid)
+    return {"archived": archived, "failed": failed}
 
 
 @router.get("/api/photos/{photo_id}")
@@ -43,6 +92,24 @@ def map_markers():
     return [dict(r) for r in conn.execute(
         "SELECT id, gps_lat lat, gps_lon lon, taken_at FROM photos "
         "WHERE gps_lat IS NOT NULL AND gps_lon IS NOT NULL")]
+
+
+@router.get("/api/map/hotspots")
+def map_hotspots():
+    """Named places ranked by photo count, for the 'Top places' panel on the map."""
+    return hotspots.top_places(get_conn())
+
+
+@router.get("/api/photos/{photo_id}/share")
+def share_photo(photo_id: int, mode: str = "untagged"):
+    """A privacy-safe copy for sharing, with faces pixelated (see privacy.py)."""
+    if mode not in ("untagged", "all"):
+        raise HTTPException(400, "mode must be 'untagged' or 'all'")
+    data = privacy.blurred_photo_bytes(get_conn(), photo_id, mode)
+    if data is None:
+        raise HTTPException(404, "No such photo")
+    return Response(content=data, media_type="image/jpeg",
+                    headers={"Content-Disposition": f'attachment; filename="shared_{photo_id}.jpg"'})
 
 
 @router.get("/media/photo/{photo_id}")

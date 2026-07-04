@@ -11,6 +11,7 @@ import traceback
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
+import cv2
 import numpy as np
 from PIL import Image, ImageOps, ExifTags
 
@@ -37,6 +38,19 @@ def start_scan() -> bool:
     STATUS.update(state="scanning", phase="starting…", total=0, done=0, current="",
                   new_photos=0, error="")
     threading.Thread(target=_run_scan, daemon=True).start()
+    return True
+
+
+def start_backfill_sharpness() -> bool:
+    """Score already-indexed photos for quality (sharpness) without re-running
+    face detection or CLIP embedding — for photos scanned before that scoring
+    existed. Returns False if a scan/backfill is already running."""
+    if STATUS["state"] in ("scanning", "stopping"):
+        return False
+    _stop.clear()
+    STATUS.update(state="scanning", phase="starting…", total=0, done=0, current="",
+                  new_photos=0, error="")
+    threading.Thread(target=_run_backfill_sharpness, daemon=True).start()
     return True
 
 
@@ -71,6 +85,41 @@ def _run_scan():
             STATUS.update(state="error", error=str(e))
 
 
+def _run_backfill_sharpness():
+    with _scan_lock:
+        try:
+            _backfill_sharpness()
+            STATUS["state"] = "idle"
+        except Exception as e:
+            traceback.print_exc()
+            STATUS.update(state="error", error=str(e))
+
+
+def _backfill_sharpness():
+    conn = get_conn()
+    rows = conn.execute("SELECT id, path FROM photos WHERE sharpness IS NULL").fetchall()
+    STATUS["total"] = len(rows)
+    STATUS["phase"] = "scoring photo quality…" if rows else ""
+
+    def score(row):
+        try:
+            img = ImageOps.exif_transpose(Image.open(row["path"]))
+            return row["id"], _sharpness(np.asarray(img.convert("RGB")))
+        except Exception:
+            return row["id"], None  # unreadable/missing file — leave unscored
+
+    with ThreadPoolExecutor(max_workers=WORKERS, initializer=_lower_thread_priority) as pool:
+        for pid, score_val in pool.map(score, rows):
+            if _stop.is_set():
+                break
+            if score_val is not None:
+                conn.execute("UPDATE photos SET sharpness=? WHERE id=?", (score_val, pid))
+            STATUS["done"] += 1
+            if STATUS["done"] % 20 == 0:
+                conn.commit()
+    conn.commit()
+
+
 def _scan():
     conn = get_conn()  # scanner thread's own connection
     folders = [r["path"] for r in conn.execute("SELECT path FROM folders")]
@@ -80,7 +129,10 @@ def _scan():
     known = {r["path"]: r["mtime"] for r in conn.execute("SELECT path, mtime FROM photos")}
     todo, seen = [], set()
     for root in folders:
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            # "Archive" holds photos the user moved out of the library (e.g. via
+            # duplicate cleanup) — never re-index them.
+            dirnames[:] = [d for d in dirnames if d.lower() != "archive"]
             for fn in filenames:
                 if os.path.splitext(fn)[1].lower() not in IMAGE_EXTS:
                     continue
@@ -172,19 +224,31 @@ def _process_photo(path: str, mtime: float) -> dict:
         faces.append({"bbox": bbox, "det_score": f.det_score, "embedding": f.embedding,
                       "crop": thumbnails.face_crop_image(rgb, bbox)})
     clip_emb = clip_search.embed_image(img)
+    sharpness = _sharpness(rgb)
     return {"path": path, "mtime": mtime, "w": w, "h": h, "taken_at": taken_at,
             "lat": lat, "lon": lon, "camera": camera, "thumb": thumb,
-            "faces": faces, "clip": clip_emb}
+            "faces": faces, "clip": clip_emb, "sharpness": sharpness}
+
+
+def _sharpness(rgb: np.ndarray) -> float:
+    """Laplacian-variance blur score on a downscaled grayscale copy (higher =
+    sharper); cheap enough to run on every photo alongside face/CLIP inference."""
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    h, w = gray.shape[:2]
+    scale = 800 / max(h, w)
+    if scale < 1:
+        gray = cv2.resize(gray, (int(w * scale), int(h * scale)))
+    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
 
 def _store_photo(conn, r: dict, persons, clusters):
     """Scan thread: DB writes + matching (sequential), plus cheap JPEG saves."""
     conn.execute("DELETE FROM photos WHERE path=?", (r["path"],))  # re-index changed file
     photo_id = conn.execute(
-        "INSERT INTO photos(path, mtime, width, height, taken_at, gps_lat, gps_lon, camera) "
-        "VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO photos(path, mtime, width, height, taken_at, gps_lat, gps_lon, camera, sharpness) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
         (r["path"], r["mtime"], r["w"], r["h"], r["taken_at"], r["lat"], r["lon"],
-         r["camera"])).lastrowid
+         r["camera"], r["sharpness"])).lastrowid
     r["thumb"].save(thumbnails.thumb_path(photo_id), "JPEG", quality=82)
 
     for f in r["faces"]:

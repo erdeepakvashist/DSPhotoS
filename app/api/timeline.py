@@ -1,6 +1,9 @@
 """One paginated endpoint powers every photo grid (timeline, person, album,
 favorites, CLIP text search); filters combine."""
+import datetime
+
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from .. import clip_search
 from ..db import get_conn
@@ -48,6 +51,50 @@ def timeline(cursor: str = "", person: int | None = None, album: int | None = No
         last = items[-1]
         next_cursor = f"{last['taken_at']}|{last['id']}"
     return {"items": items, "next_cursor": next_cursor, "mode": "timeline"}
+
+
+class SearchLogIn(BaseModel):
+    query: str
+
+
+@router.post("/search/log")
+def log_search(body: SearchLogIn):
+    q = body.query.strip()
+    if q:
+        get_conn().execute("INSERT INTO search_history(query) VALUES (?)", (q,))
+        get_conn().commit()
+    return {"ok": True}
+
+
+@router.get("/search/suggestions")
+def search_suggestions(limit: int = 8):
+    """Past searches ranked by frequency, ties broken by recency — powers the
+    autocomplete dropdown under the search box."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT query, COUNT(*) n, MAX(searched_at) last FROM search_history "
+        "GROUP BY query COLLATE NOCASE ORDER BY n DESC, last DESC LIMIT ?", (limit,)).fetchall()
+    return [r["query"] for r in rows]
+
+
+@router.get("/memories")
+def memories():
+    """Photos taken on today's month/day in previous years ('On This Day')."""
+    conn = get_conn()
+    today = datetime.date.today()
+    md = today.strftime("-%m-%d")
+    rows = conn.execute(
+        "SELECT id, taken_at, width, height, favorite, "
+        "CAST(substr(taken_at, 1, 4) AS INTEGER) year "
+        "FROM photos WHERE substr(taken_at, 5, 6) = ? "
+        "ORDER BY taken_at DESC", (md,)).fetchall()
+    by_year: dict[int, list[dict]] = {}
+    for r in rows:
+        year = r["year"]
+        if year == today.year:
+            continue  # only past years count as a "memory"
+        by_year.setdefault(year, []).append(dict(r))
+    return [{"year": y, "photos": by_year[y]} for y in sorted(by_year, reverse=True)]
 
 
 def _apply_filters(conn, ids: list[int], person, album, favorites) -> list[int]:

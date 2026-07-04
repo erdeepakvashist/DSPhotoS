@@ -56,16 +56,22 @@ function route() {
       (a.dataset.tab === "albums" && name === "album"));
   });
   document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+  $("#memories-strip").classList.add("hidden");
   clearSelection();
 
   if (name === "people") { $("#view-people").classList.remove("hidden"); loadPeople(); }
   else if (name === "unknown") { $("#view-unknown").classList.remove("hidden"); loadClusters(); }
+  else if (name === "duplicates") { $("#view-duplicates").classList.remove("hidden"); loadDuplicates(); }
   else if (name === "albums") { $("#view-albums").classList.remove("hidden"); loadAlbums(); }
   else if (name === "map") { $("#view-map").classList.remove("hidden"); loadMap(); }
   else if (name === "settings") { $("#view-settings").classList.remove("hidden"); loadSettings(); }
   else if (name === "facesearch") {
     $("#view-grid").classList.remove("hidden");
     renderFaceResults();
+  }
+  else if (name === "best") {
+    $("#view-grid").classList.remove("hidden");
+    renderBestShots();
   }
   else {
     // photo grid variants: photos | person/<id> | album/<id> | favorites | search
@@ -76,7 +82,58 @@ function route() {
     if (name === "favorites") f.favorites = 1;
     if (name === "search") f.query = decodeURIComponent(arg || "");
     startGrid(f);
+    if (name === "photos" && !arg) loadMemories();
   }
+}
+
+async function showSuggestions() {
+  const box = $("#search-suggestions");
+  const suggestions = await api.get("/api/search/suggestions");
+  if (!suggestions.length) { box.classList.add("hidden"); return; }
+  box.innerHTML = "";
+  for (const q of suggestions) {
+    const row = el("div", "suggestion-row", "🕘 " + q);
+    row.onmousedown = (e) => {
+      e.preventDefault();
+      $("#search-input").value = q;
+      hideSuggestions();
+      api.send("POST", "/api/search/log", { query: q }).catch(() => {});
+      location.hash = "#search/" + encodeURIComponent(q);
+    };
+    box.appendChild(row);
+  }
+  box.classList.remove("hidden");
+}
+
+function hideSuggestions() {
+  $("#search-suggestions").classList.add("hidden");
+}
+
+async function loadMemories() {
+  const strip = $("#memories-strip");
+  const groups = await api.get("/api/memories");
+  if (!groups.length) { strip.classList.add("hidden"); return; }
+  strip.innerHTML = "";
+  for (const g of groups) {
+    const yearsAgo = new Date().getFullYear() - g.year;
+    const card = el("div", "memory-card");
+    card.append(el("div", "memory-title", `📅 On this day, ${yearsAgo} year${yearsAgo === 1 ? "" : "s"} ago`));
+    const row = el("div", "memory-photos");
+    for (const p of g.photos.slice(0, 8)) {
+      const img = document.createElement("img");
+      img.src = `/media/thumb/${p.id}`;
+      img.onclick = () => openMemoryPhoto(g.photos, p.id);
+      row.appendChild(img);
+    }
+    card.appendChild(row);
+    strip.appendChild(card);
+  }
+  strip.classList.remove("hidden");
+}
+
+function openMemoryPhoto(photos, photoId) {
+  state.items = photos;
+  openLightbox(photos.findIndex((p) => p.id === photoId));
 }
 
 function bindChrome() {
@@ -84,8 +141,15 @@ function bindChrome() {
   si.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       const q = si.value.trim();
+      hideSuggestions();
+      if (q) api.send("POST", "/api/search/log", { query: q }).catch(() => {});
       location.hash = q ? "#search/" + encodeURIComponent(q) : "#photos";
     }
+  });
+  si.addEventListener("focus", () => { if (!si.value.trim()) showSuggestions(); });
+  si.addEventListener("input", () => { if (!si.value.trim()) showSuggestions(); else hideSuggestions(); });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".searchbox")) hideSuggestions();
   });
   $("#cam-btn").onclick = cameraSearch;
   $("#sel-clear").onclick = clearSelection;
@@ -105,6 +169,15 @@ function bindChrome() {
   $("#stop-scan-btn").onclick = async () => {
     try { await api.send("POST", "/api/scan/stop"); } catch (e) { /* not running */ }
     pollStatus();
+  };
+  $("#backfill-btn").onclick = async () => {
+    try { await api.send("POST", "/api/scan/backfill-sharpness"); } catch (e) { /* already running */ }
+    pollStatus();
+  };
+  $("#export-csv-btn").onclick = () => {
+    const a = document.createElement("a");
+    a.href = "/api/export/csv"; a.download = "";
+    document.body.appendChild(a); a.click(); a.remove();
   };
   $("#restart-app-btn").onclick = async () => {
     if (!confirm("Restart the app? A running scan will stop (it resumes on the next scan).")) return;
@@ -166,8 +239,10 @@ async function renderGridHeader() {
     const a = albums.find((x) => x.id === f.album);
     h.innerHTML = "";
     const back = el("button", "btn ghost", "←"); back.onclick = () => (location.hash = "#albums");
+    const play = el("button", "btn primary", "▶ Play as story");
+    play.onclick = () => playStory(f.album);
     h.append(back, el("span", "", a ? a.name : "Album"),
-             el("span", "sub", a ? `${a.photo_count} photos` : ""));
+             el("span", "sub", a ? `${a.photo_count} photos` : ""), play);
     h.classList.remove("hidden");
   } else if (f.favorites) {
     h.textContent = "♥ Favorites"; h.classList.remove("hidden");
@@ -336,6 +411,92 @@ function renderFaceResults() {
   appendItems(faceResults.items, "search");
 }
 
+async function renderBestShots() {
+  const h = $("#grid-header");
+  $("#grid").innerHTML = "";
+  $("#grid").dataset.lastMonth = "";
+  $("#grid-empty").classList.add("hidden");
+  state.items = []; state.cursor = null; state.done = true; state.filters = {};
+  const items = await api.get("/api/best-shots");
+  h.classList.remove("hidden");
+  h.innerHTML = "";
+  h.append(el("span", "", "✨ Best Shots"),
+           el("span", "sub", "Sharpest photos in your library, by blur-detection score"));
+  if (!items.length) {
+    const e = $("#grid-empty");
+    e.classList.remove("hidden");
+    e.textContent = "No scored photos yet — run a scan first.";
+    return;
+  }
+  appendItems(items, "search");
+}
+
+/* ---------------- story / slideshow viewer ---------------- */
+const story = { photos: [], i: 0, timer: null, paused: false, slideMs: 3500 };
+
+async function playStory(albumId) {
+  const photos = await api.get(`/api/albums/${albumId}/photos`);
+  if (!photos.length) return;
+  story.photos = photos; story.i = 0; story.paused = false;
+  $("#story-view").classList.remove("hidden");
+  renderStoryProgress();
+  showStorySlide();
+  bindStoryOnce();
+}
+
+function renderStoryProgress() {
+  const bar = $("#story-progress");
+  bar.innerHTML = "";
+  story.photos.forEach((_, i) => {
+    const seg = el("div", "story-seg" + (i === story.i ? " active" : i < story.i ? " done" : ""));
+    bar.appendChild(seg);
+  });
+}
+
+function showStorySlide() {
+  $("#story-img").src = "/media/photo/" + story.photos[story.i].id;
+  renderStoryProgress();
+  clearTimeout(story.timer);
+  if (!story.paused) story.timer = setTimeout(nextStorySlide, story.slideMs);
+}
+
+function nextStorySlide() {
+  if (story.i >= story.photos.length - 1) { closeStory(); return; }
+  story.i++;
+  showStorySlide();
+}
+
+function prevStorySlide() {
+  if (story.i === 0) return;
+  story.i--;
+  showStorySlide();
+}
+
+function closeStory() {
+  clearTimeout(story.timer);
+  $("#story-view").classList.add("hidden");
+}
+
+let storyBound = false;
+function bindStoryOnce() {
+  if (storyBound) return;
+  storyBound = true;
+  $("#story-close").onclick = closeStory;
+  $("#story-next").onclick = nextStorySlide;
+  $("#story-prev").onclick = prevStorySlide;
+  $("#story-pause").onclick = () => {
+    story.paused = !story.paused;
+    $("#story-pause").textContent = story.paused ? "▶" : "⏸";
+    if (story.paused) clearTimeout(story.timer); else showStorySlide();
+  };
+  document.addEventListener("keydown", (e) => {
+    if ($("#story-view").classList.contains("hidden")) return;
+    if (e.key === "Escape") closeStory();
+    else if (e.key === "ArrowRight") nextStorySlide();
+    else if (e.key === "ArrowLeft") prevStorySlide();
+  });
+}
+
 /* ---------------- selection ---------------- */
 function toggleSelect(id, tile) {
   if (state.selection.has(id)) state.selection.delete(id);
@@ -452,6 +613,47 @@ async function loadClusters() {
   }
 }
 
+/* ---------------- duplicates ---------------- */
+async function loadDuplicates() {
+  const groups = await api.get("/api/duplicates");
+  const list = $("#duplicate-list");
+  const empty = $("#duplicates-empty");
+  list.innerHTML = "";
+  $("#dup-badge").classList.toggle("hidden", !groups.length);
+  $("#dup-badge").textContent = groups.length;
+  if (!groups.length) {
+    empty.textContent = "No near-duplicate photos found 🎉";
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  for (const group of groups) {
+    const card = el("div", "cluster");
+    const pile = el("div", "facepile");
+    group.forEach((p, i) => {
+      const wrap = el("div", "dup-thumb");
+      const img = document.createElement("img");
+      img.src = "/media/thumb/" + p.id;
+      img.onclick = () => openLightboxSingle(p.id);
+      wrap.appendChild(img);
+      if (i === 0) wrap.appendChild(el("span", "dup-keep", "★ Keep"));
+      pile.appendChild(wrap);
+    });
+    const meta = el("div", "meta", `${group.length} similar photos`);
+    const archiveBtn = el("button", "btn danger", `Archive the other ${group.length - 1}`);
+    archiveBtn.onclick = async () => {
+      const ids = group.slice(1).map((p) => p.id);
+      if (!confirm(`Move ${ids.length} photo(s) into an "Archive" folder next to the originals? `
+        + `Files are moved, not deleted — you can review and delete them yourself later.`)) return;
+      archiveBtn.disabled = true;
+      await api.send("POST", "/api/duplicates/archive", { photo_ids: ids });
+      loadDuplicates();
+    };
+    card.append(pile, meta, archiveBtn);
+    list.appendChild(card);
+  }
+}
+
 function updateUnknownBadge(n) {
   const b = $("#unknown-badge");
   b.classList.toggle("hidden", !n);
@@ -530,6 +732,29 @@ async function loadMap() {
     });
   });
   state.map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+  loadHotspots();
+}
+
+async function loadHotspots() {
+  const places = await api.get("/api/map/hotspots");
+  if (!state.hotspotLayer) state.hotspotLayer = L.layerGroup().addTo(state.map);
+  state.hotspotLayer.clearLayers();
+  const panel = $("#map-places");
+  panel.innerHTML = "";
+  if (!places.length) return;
+  panel.appendChild(el("h3", "", "📍 Top places"));
+  const maxCount = Math.max(...places.map((p) => p.count));
+  for (const p of places) {
+    // radius scales with sqrt(count) so area (not radius) tracks photo density
+    const radius = 400 + 2200 * Math.sqrt(p.count / maxCount);
+    L.circle([p.lat, p.lon], {
+      radius, color: "#4b90f5", weight: 1, fillColor: "#8ab4f8", fillOpacity: 0.15,
+    }).addTo(state.hotspotLayer);
+    const row = el("div", "place-row");
+    row.append(el("span", "", p.name), el("span", "count", `${p.count}`));
+    row.onclick = () => state.map.setView([p.lat, p.lon], 11);
+    panel.appendChild(row);
+  }
 }
 
 /* ---------------- settings ---------------- */
@@ -607,6 +832,9 @@ async function pollStatus() {
   $("#index-stats").innerHTML =
     `<div><b>${s.stats.photos}</b>photos</div><div><b>${s.stats.faces}</b>faces</div>` +
     `<div><b>${s.stats.persons}</b>people</div><div><b>${s.stats.clusters}</b>unknown groups</div>`;
+  $("#backfill-row").classList.toggle("hidden", !s.stats.unscored || running);
+  $("#backfill-note").textContent = s.stats.unscored
+    ? `${s.stats.unscored} photo(s) scanned before quality scoring was added` : "";
 }
 
 /* ---------------- lightbox ---------------- */
@@ -627,6 +855,7 @@ function bindLightbox() {
   $("#lb-fav").onclick = lbToggleFav;
   $("#lb-album").onclick = () => { const p = lbPhoto(); p && pickAlbum([p.id]); };
   $("#lb-faces").onclick = () => { state.lbFaces = !state.lbFaces; renderLightbox(); };
+  $("#lb-share").onclick = shareSafely;
   $("#lb-info").onclick = () => $("#lb-panel").classList.toggle("hidden");
   window.addEventListener("resize", () => !lbHidden() && positionFaceBoxes());
   document.addEventListener("keydown", (e) => {
@@ -741,6 +970,12 @@ async function faceMenu(face) {
     };
     box.appendChild(clr);
   }
+  const find = el("button", "btn list-item", "🔍 Find photos with this face");
+  find.onclick = async () => {
+    closeModal();
+    faceResults = await api.get(`/api/faces/${face.id}/similar`);
+    location.hash = "#facesearch";
+  };
   const ign = el("button", "btn danger list-item", "Not a face / ignore");
   ign.onclick = async () => {
     await api.send("POST", `/api/faces/${face.id}/ignore`);
@@ -748,9 +983,34 @@ async function faceMenu(face) {
   };
   const cancel = el("button", "btn ghost list-item", "Cancel");
   cancel.onclick = closeModal;
-  box.append(ign, cancel);
+  box.append(find, ign, cancel);
   $("#modal").classList.remove("hidden");
   inp.focus();
+}
+
+function shareSafely() {
+  const p = lbPhoto();
+  if (!p) return;
+  const box = $("#modal-box");
+  box.innerHTML = "<h3>🛡️ Share safely</h3><p class='hint'>Download a copy with faces pixelated, "
+    + "so bystanders aren't shared without consent. Your original file is never changed.</p>";
+  const untagged = el("button", "btn primary list-item", "Blur only unnamed faces");
+  untagged.onclick = () => { closeModal(); downloadShare(p.id, "untagged"); };
+  const all = el("button", "btn list-item", "Blur every face");
+  all.onclick = () => { closeModal(); downloadShare(p.id, "all"); };
+  const cancel = el("button", "btn ghost list-item", "Cancel");
+  cancel.onclick = closeModal;
+  box.append(untagged, all, cancel);
+  $("#modal").classList.remove("hidden");
+}
+
+function downloadShare(photoId, mode) {
+  const a = document.createElement("a");
+  a.href = `/api/photos/${photoId}/share?mode=${mode}`;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function renderInfoPanel(d) {

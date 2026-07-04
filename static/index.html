@@ -28,6 +28,7 @@
     <span class="search-ico">⌕</span>
     <input id="search-input" type="search" placeholder="Search photos — try &quot;beach&quot;, &quot;dog&quot;, &quot;birthday cake&quot;…">
     <button id="cam-btn" class="cam-btn" title="Search by face — take a photo with the camera">📷</button>
+    <div id="search-suggestions" class="search-suggestions hidden"></div>
   </div>
   <div id="scan-chip" class="scan-chip hidden" title="Scan progress — click for details"
        onclick="location.hash='#settings'">
@@ -37,8 +38,10 @@
 
 <nav class="tabs">
   <a href="#photos"    data-tab="photos">Photos</a>
+  <a href="#best"      data-tab="best">✨ Best</a>
   <a href="#people"    data-tab="people">People</a>
   <a href="#unknown"   data-tab="unknown">Unknown <span id="unknown-badge" class="badge hidden"></span></a>
+  <a href="#duplicates" data-tab="duplicates">Duplicates <span id="dup-badge" class="badge hidden"></span></a>
   <a href="#albums"    data-tab="albums">Albums</a>
   <a href="#map"       data-tab="map">Map</a>
   <a href="#settings"  data-tab="settings">Settings</a>
@@ -46,6 +49,7 @@
 
 <main id="main">
   <div id="view-grid" class="view">
+    <div id="memories-strip" class="memories-strip hidden"></div>
     <div id="grid-header" class="grid-header hidden"></div>
     <div id="grid"></div>
     <div id="grid-sentinel"></div>
@@ -60,6 +64,14 @@
     <div id="cluster-list"></div>
   </div>
 
+  <div id="view-duplicates" class="view hidden">
+    <p class="hint">Photos that look nearly identical, grouped together. The sharpest/highest-resolution
+      copy is marked ★ Keep. Archiving moves the others into an "Archive" folder next to the originals
+      — nothing is ever deleted automatically; review and delete them yourself when ready.</p>
+    <div id="duplicate-list"></div>
+    <div id="duplicates-empty" class="empty hidden"></div>
+  </div>
+
   <div id="view-albums" class="view hidden">
     <div class="toolbar">
       <button id="new-album-btn" class="btn">＋ New album</button>
@@ -67,7 +79,12 @@
     <div id="albums-grid" class="cards"></div>
   </div>
 
-  <div id="view-map" class="view hidden"><div id="map"></div></div>
+  <div id="view-map" class="view hidden">
+    <div class="map-layout">
+      <div id="map"></div>
+      <div id="map-places" class="map-places"></div>
+    </div>
+  </div>
 
   <div id="view-settings" class="view hidden">
     <section class="panel">
@@ -90,6 +107,18 @@
       <div id="scan-progress" class="progress hidden"><div id="scan-bar"></div></div>
       <div id="scan-status" class="hint"></div>
       <div id="index-stats" class="stats"></div>
+      <div id="backfill-row" class="row hidden">
+        <button id="backfill-btn" class="btn">✨ Score existing photos for quality</button>
+        <span id="backfill-note" class="hint"></span>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>📤 Export</h2>
+      <div class="row">
+        <button id="export-csv-btn" class="btn">Export metadata to CSV</button>
+        <span class="hint">Photo paths, dates, people, albums, favorites and GPS —
+          for use in other tools. Original photo files are never touched.</span>
+      </div>
     </section>
     <section class="panel">
       <h2>⚙️ App</h2>
@@ -110,6 +139,18 @@
   <button class="btn ghost" id="sel-clear">Cancel</button>
 </div>
 
+<!-- story / slideshow viewer -->
+<div id="story-view" class="story-view hidden">
+  <div id="story-progress" class="story-progress"></div>
+  <button class="icon-btn story-close" id="story-close" title="Close (Esc)">✕</button>
+  <img id="story-img">
+  <div class="story-nav">
+    <button class="icon-btn" id="story-prev">‹</button>
+    <button class="icon-btn" id="story-pause">⏸</button>
+    <button class="icon-btn" id="story-next">›</button>
+  </div>
+</div>
+
 <!-- lightbox -->
 <div id="lightbox" class="lightbox hidden">
   <div class="lb-top">
@@ -118,6 +159,7 @@
     <button class="icon-btn" id="lb-fav" title="Favorite (F)">♡</button>
     <button class="icon-btn" id="lb-album" title="Add to album">➕</button>
     <button class="icon-btn" id="lb-faces" title="Show faces (B)">👤</button>
+    <button class="icon-btn" id="lb-share" title="Share safely (blur strangers' faces)">🛡️</button>
     <button class="icon-btn" id="lb-info" title="Info (I)">ⓘ</button>
   </div>
   <button class="lb-nav prev" id="lb-prev" title="Previous (←)">‹</button>

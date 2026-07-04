@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS photos (
     gps_lat REAL, gps_lon REAL,
     camera TEXT,
     favorite INTEGER NOT NULL DEFAULT 0,
+    sharpness REAL,              -- Laplacian-variance blur score (higher = sharper)
     scanned_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_photos_taken ON photos(taken_at DESC, id DESC);
@@ -78,6 +79,12 @@ CREATE TABLE IF NOT EXISTS clip_embeddings (
     photo_id INTEGER PRIMARY KEY REFERENCES photos(id) ON DELETE CASCADE,
     embedding BLOB NOT NULL     -- 512 x float32, L2-normalized
 );
+CREATE TABLE IF NOT EXISTS search_history (
+    id INTEGER PRIMARY KEY,
+    query TEXT NOT NULL,
+    searched_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);
 """
 
 
@@ -104,6 +111,10 @@ def init_db():
     # migrations for DBs created before these columns existed
     try:
         conn.execute("ALTER TABLE albums ADD COLUMN auto TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already present
+    try:
+        conn.execute("ALTER TABLE photos ADD COLUMN sharpness REAL")
     except sqlite3.OperationalError:
         pass  # column already present
     conn.commit()

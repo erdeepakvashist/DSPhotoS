@@ -21,6 +21,12 @@ THEMES = {
     "🏖️ Beach": "a photo taken at the beach with sand and sea",
     "🏔️ Mountains": "a photo of mountains and hiking in nature",
     "🍽️ Food": "a close-up photo of a plate of delicious food",
+    "🐾 Pets": "a photo of a pet dog or cat",
+    "🤳 Selfies": "a close-up selfie photo of one person's face",
+    "👨‍👩‍👧 Group photos": "a group photo of several people posing together",
+    "🌇 Golden hour": "a photo taken at sunset or sunrise with warm golden light",
+    "🏠 Indoors": "a photo taken indoors inside a room or building",
+    "🌳 Outdoors": "a photo taken outdoors in nature or a street",
 }
 THEME_THRESHOLD = 0.24   # CLIP cosine floor for a photo to join a theme album
 MIN_ALBUM_PHOTOS = 4     # don't create tiny albums
