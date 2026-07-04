@@ -97,7 +97,8 @@ def timeline_years():
 
 @router.get("/memories")
 def memories():
-    """Photos taken on today's month/day in previous years ('On This Day')."""
+    """Photos taken on today's month/day in previous years ('On This Day'),
+    restricted to photos with at least one identified (named) face."""
     conn = get_conn()
     today = datetime.date.today()
     md = today.strftime("-%m-%d")
@@ -105,6 +106,7 @@ def memories():
         "SELECT id, taken_at, width, height, favorite, "
         "CAST(substr(taken_at, 1, 4) AS INTEGER) year "
         "FROM photos WHERE substr(taken_at, 5, 6) = ? "
+        "AND id IN (SELECT photo_id FROM faces WHERE person_id IS NOT NULL AND ignored=0) "
         "ORDER BY taken_at DESC", (md,)).fetchall()
     by_year: dict[int, list[dict]] = {}
     for r in rows:
